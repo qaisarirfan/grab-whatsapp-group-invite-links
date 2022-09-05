@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
 
-  "name": "Chrome Extension TypeScript Starter",
-  "description": "Chrome Extension, TypeScript, Visual Studio Code",
+  "name": "Grab whatsapp group invite links",
+  "description": "Grab whatsapp group invite links",
   "version": "1.0",
 
   "options_ui": {
@@ -26,7 +26,8 @@
   },
 
   "permissions": [
-    "storage"
+    "storage",
+    "activeTab"
   ],
 
   "host_permissions": [
