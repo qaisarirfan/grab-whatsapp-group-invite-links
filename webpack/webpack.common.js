@@ -1,14 +1,16 @@
 const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
+const TerserPlugin = require('terser-webpack-plugin');
 
 const srcDir = path.join(__dirname, '..', 'src');
 
 module.exports = {
   entry: {
-    popup: path.join(srcDir, 'popup.js'),
-    options: path.join(srcDir, 'options.js'),
     background: path.join(srcDir, 'background.js'),
     content_script: path.join(srcDir, 'content_script.js'),
+    content: path.join(srcDir, 'content.js'),
+    options: path.join(srcDir, 'options.js'),
+    popup: path.join(srcDir, 'popup.js'),
   },
   output: {
     path: path.join(__dirname, '../dist/js'),
@@ -19,6 +21,12 @@ module.exports = {
     ignored: /node_modules/,
   },
   optimization: {
+    minimize: true,
+    minimizer: [new TerserPlugin({
+      terserOptions: {
+        mangle: true,
+      },
+    })],
     splitChunks: {
       name: 'vendor',
       chunks(chunk) {

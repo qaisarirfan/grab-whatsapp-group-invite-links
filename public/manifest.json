@@ -13,7 +13,11 @@
     "default_icon": "icon.png",
     "default_popup": "popup.html"
   },
-
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+   "128": "icon.png"
+  },
   "content_scripts": [
       {
           "matches": ["<all_urls>"],
@@ -22,15 +26,28 @@
   ],
 
   "background": {
-    "service_worker": "js/background.js"
+    "service_worker": "js/background.js",
+    "type": "module"
   },
 
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "scripting",
+    "contextMenus"
   ],
 
   "host_permissions": [
     "<all_urls>"
-  ]
+  ],
+
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+W",
+        "mac": "MacCtrl+Shift+W"
+      },
+      "description": "Opens hello.html"
+    }
+  }
 }

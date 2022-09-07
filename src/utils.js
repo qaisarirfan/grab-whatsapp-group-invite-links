@@ -15,7 +15,14 @@ export const isValidURL = (string) => {
   return (res !== null);
 };
 
+export const isGoogle = (location) => {
+  if (!location) return false;
+  const url = new URL(location);
+  return `${url?.origin}${url?.pathname}` === 'https://www.google.com/search';
+};
+
 export default {
   inviteLink,
   isValidURL,
+  isGoogle,
 };
