@@ -11,7 +11,7 @@ export const inviteLink = (link) => {
 };
 
 export const isValidURL = (string) => {
-  const res = string.match(/(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)/g);
+  const res = string.match(/(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)/g);
   return (res !== null);
 };
 
@@ -21,8 +21,17 @@ export const isGoogle = (location) => {
   return `${url?.origin}${url?.pathname}` === 'https://www.google.com/search';
 };
 
+export const copyToClipboard = async (text) => {
+  await navigator.clipboard.writeText(text);
+};
+
+// eslint-disable-next-line no-promise-executor-return
+export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export default {
   inviteLink,
   isValidURL,
   isGoogle,
+  copyToClipboard,
+  sleep,
 };
