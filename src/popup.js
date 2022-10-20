@@ -1,19 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
-import ReactDOM from 'react-dom';
-import axios from 'axios';
 import { load } from 'cheerio';
+import axios from 'axios';
+import ReactDOM from 'react-dom';
 import styled from 'styled-components';
-import {
-  copyToClipboard, inviteLink, isGoogle,
-} from './utils';
+
+import { copyToClipboard, inviteLink, isGoogle } from './utils';
 
 const Container = styled.div`
-  max-width: 600px;
-  min-height: 300px;
-  padding: 12px;
+  max-width: 700px;
+  min-height: calc(100vh - 50px);
+  min-width: 500px;
   padding-top: 0px;
+  padding: 12px;
   position: relative;
-  width: 500px;
 `;
 
 const StatusBarContainer = styled.div`
@@ -31,6 +30,41 @@ const StatusBarContainer = styled.div`
   top: 0;
 `;
 
+const Item = styled.li`
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+
+  a {
+    margin-right: 4px;
+  }
+`;
+
+const ExtractButton = styled.button`
+  &::after{
+    border-color: #000;
+    border-top-color: transparent;
+    border-right-color: transparent;
+  }
+`;
+
+const StyledHeader = styled.header`
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  padding: 8px;
+
+  img {
+    height: auto;
+    margin-right: 16px;
+    width: 32px;
+  }
+
+  p {
+    font-size: 20px;
+  }
+`;
+
 function Popup() {
   const [currentURL, setCurrentURL] = useState();
   const [googleSearchLinks, setGoogleSearchLinks] = useState([]);
@@ -42,7 +76,6 @@ function Popup() {
   const [links, setLinks] = useState([]);
   const [logs, setLogs] = useState([]);
   const [otherLinks, setOtherLinks] = useState([]);
-  const [toggleLogs, setToggleLogs] = useState(false);
 
   const bottomRef = useRef(null);
 
@@ -98,11 +131,13 @@ function Popup() {
       errorMessage: null,
       hasError: false,
       link: new URL(val).origin,
+      href: new URL(val).href,
     };
     try {
       const { data } = await axios.get(val, { timeout: 10000 });
       const $ = load(data);
       const a = $('a');
+      // eslint-disable-next-line array-callback-return
       $(a).map((i, ele) => {
         const link = inviteLink($(ele).attr('href'));
         if (link) { waLinks.push(link); }
@@ -122,8 +157,10 @@ function Popup() {
   };
 
   const fetch = async () => {
-    setLoading(true);
+    setHasCopyAsJSON(false);
+    setHasCopyAsText(false);
     setLinks([]);
+    setLoading(true);
     setLogs([]);
     let store = [];
     const promise = googleSearchLinks.map((link) => getWhatsappLink(link));
@@ -141,8 +178,8 @@ function Popup() {
 
   const onCopyAsTextHandler = async () => {
     setHasCopyAsJSON(false);
-    setIsCopyAsText(true);
     setHasCopyAsText(false);
+    setIsCopyAsText(true);
     try {
       const text = links.join('\r\n');
       await copyToClipboard(text);
@@ -193,113 +230,92 @@ function Popup() {
   }
 
   return (
-    <Container>
-      <StatusBarContainer>
-        <div>{links.length > 0 && <p>{`Total: ${links.length}`}</p>}</div>
-        <div>
-          <a
-            data-modal="modal-01"
-            className="js-open-modal"
-            onClick={() => setToggleLogs(true)}
-          >
-            Logs
-          </a>
-          <button
-            className={copyAsTextButton.join(' ')}
-            type="button"
-            onClick={onCopyAsTextHandler}
-            disabled={links.length < 1}
-          >
-            {`${hasCopyAsText ? 'Copied' : 'Copy'} as Text`}
-          </button>
-          <button
-            className={copyAsJSONButton.join(' ')}
-            type="button"
-            onClick={onCopyAsJSONHandler}
-            disabled={links.length < 1}
-          >
-            {`${hasCopyAsJSON ? 'Copied' : 'Copy'} as JSON`}
-          </button>
-        </div>
-      </StatusBarContainer>
-      {links.length > 0 && (
-        <table className="ff-table bordered-rows full-width striped padding-tiny">
-          <tbody>
-            {links.map((link) => (
-              <tr key={link}>
-                <td><a target="_blank" href={link} rel="noreferrer">{link}</a></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      {(!isGoogleSearchPage && links.length < 1) && (
-        <p className="text-centre">{`There is no WhatsApp group link on this page but you found ${otherLinks.length} other links.`}</p>
-      )}
-      {isGoogleSearchPage && (
-        <>
-          <p className="text-centre">Extract WhatsApp group links from Google search</p>
-          <div className="text-center">
+    <>
+      <StyledHeader className="ff-card bg-white">
+        <img src="./images/logo.png" alt="logo" />
+        <p>Grab whatsapp group invite links</p>
+      </StyledHeader>
+      <Container>
+        <StatusBarContainer>
+          <div>{links.length > 0 && <p>{`Total: ${links.length}`}</p>}</div>
+          <div>
+            {(isGoogleSearchPage && links.length > 0) && (
+              <button
+                className={`size-small bg-yellow shadow-hard ${isLoading && 'with-loader'}`}
+                type="button"
+                onClick={fetch}
+                disabled={isLoading}
+              >
+                Extract again
+              </button>
+            )}
             <button
-              className={`bg-yellow shadow-hard ${isLoading && 'with-loader'}`}
+              className={copyAsTextButton.join(' ')}
               type="button"
-              onClick={fetch}
-              disabled={isLoading}
+              onClick={onCopyAsTextHandler}
+              disabled={links.length < 1}
             >
-              Extract
+              {`${hasCopyAsText ? 'Copied' : 'Copy'} as Text`}
+            </button>
+            <button
+              className={copyAsJSONButton.join(' ')}
+              type="button"
+              onClick={onCopyAsJSONHandler}
+              disabled={links.length < 1}
+            >
+              {`${hasCopyAsJSON ? 'Copied' : 'Copy'} as JSON`}
             </button>
           </div>
-          {links.length < 1 && (
-            <ul
-              style={{
-                height: '100px',
-                overflow: 'auto',
-              }}
-            >
-              {logs.map((log, index) => (
-                <li key={`${log?.link}-${index}`} style={{ color: log?.hasError ? 'red' : 'inherit' }}>
-                  <p>{`${log?.link} - finds ${log?.count} links`}</p>
-                  <span>{log?.errorMessage}</span>
-                </li>
+        </StatusBarContainer>
+        {links.length > 0 && (
+          <table className="ff-table bordered-rows full-width striped padding-tiny">
+            <tbody>
+              {links.map((link) => (
+                <tr key={link}>
+                  <td><a className="font-mono text-small" target="_blank" href={link} rel="noreferrer">{link}</a></td>
+                </tr>
               ))}
-              <li ref={bottomRef} />
-            </ul>
-          )}
-        </>
-      )}
-      <div id="modal-01" className={`ff-modal-wrapper ${toggleLogs && 'active'}`}>
-        <div className="ff-modal-overlay">
-          <div className="ff-modal-content">
-            <div className="ff-card padding-medium shape-rounded bg-white shadow-soft">
-              <a
-                className="close-modal js-close-modal"
-                onClick={() => setToggleLogs(false)}
+            </tbody>
+          </table>
+        )}
+        {(!isGoogleSearchPage && links.length < 1) && (
+          <p className="text-centre">{`There is no WhatsApp group link on this page but you found ${otherLinks.length} other links.`}</p>
+        )}
+        {(isGoogleSearchPage && links.length < 1) && (
+          <>
+            <p className="text-centre">Extract WhatsApp group links from Google search result</p>
+            <div className="text-center">
+              <ExtractButton
+                className={`bg-yellow shadow-hard ${isLoading && 'with-loader'}`}
+                type="button"
+                onClick={fetch}
+                disabled={isLoading}
               >
-                <span className="text-large">×</span>
-              </a>
-              <table className="ff-table bordered-rows full-width padding-tiny">
-                <tbody>
-                  {logs.map((log) => (
-                    <tr className={`${log?.hasError && 'text-brown'}`} key={log?.link}>
-                      <td>
-                        <p>{`${log?.link} - finds ${log?.count} links`}</p>
-                        <span>{log?.errorMessage}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                Extract
+              </ExtractButton>
             </div>
-          </div>
-        </div>
-      </div>
-    </Container>
+          </>
+        )}
+        {(isGoogleSearchPage && links.length < 1) && (
+          <ul style={{ height: '200px', overflow: 'auto' }}>
+            {logs.map((log, index) => (
+              <Item
+                // eslint-disable-next-line react/no-array-index-key
+                key={`${log?.link}-${index}`}
+                style={{ color: log?.hasError ? 'red' : 'inherit' }}
+                className="font-mono text-small"
+              >
+                <a target="_blank" href={log?.href} rel="noreferrer">{log?.link}</a>
+                {log?.count > 0 && <p>{` - finds ${log?.count} links`}</p>}
+                {log?.errorMessage && <span>{log?.errorMessage}</span>}
+              </Item>
+            ))}
+            <li ref={bottomRef} />
+          </ul>
+        )}
+      </Container>
+    </>
   );
 }
 
-ReactDOM.render(
-  <React.StrictMode>
-    <Popup />
-  </React.StrictMode>,
-  document.getElementById('root'),
-);
+ReactDOM.render(<React.StrictMode><Popup /></React.StrictMode>, document.getElementById('root'));
