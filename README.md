@@ -1,8 +1,15 @@
-# Chrome Extension TypeScript Starter
+# Grab WhatsApp groups links
 
-![build](https://github.com/chibat/chrome-extension-typescript-starter/workflows/build/badge.svg)
+![build](https://github.com/qaisarirfan/grab-whatsapp-group-invite-links/workflows/build/badge.svg)
 
-Chrome Extension, TypeScript and Visual Studio Code
+An easy to use extractor or grabber for WhatsApp groups hyperlinks on an HTML page or Google search results.
+
+## Features:
+
+* Requires no special permissions
+* No usage information / analytics are collected from you
+* Copy links to clipboard as text and JSON
+* Logs if you are extracting WhatsApp groups hyperlinks form Google Google search results.
 
 ## Prerequisites
 
@@ -14,33 +21,15 @@ Chrome Extension, TypeScript and Visual Studio Code
 
 ## Includes the following
 
-* TypeScript
 * Webpack
 * React
 * Jest
-* Example Code
-    * Chrome Storage
-    * Options Version 2
-    * content script
-    * count up badge number
-    * background
-
-## Project Structure
-
-* src/typescript: TypeScript source files
-* src/assets: static files
-* dist: Chrome Extension directory
-* dist/js: Generated JavaScript files
 
 ## Setup
 
 ```
 npm install
 ```
-
-## Import as Visual Studio Code project
-
-...
 
 ## Build
 
