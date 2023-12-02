@@ -1,17 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import { load } from 'cheerio';
 import axios from 'axios';
-import ReactDOM from 'react-dom';
 import styled from 'styled-components';
 
 import { copyToClipboard, inviteLink, isGoogle } from './utils';
 
 const Container = styled.div`
   max-width: 700px;
-  min-height: calc(100vh - 50px);
+  min-height: calc(100vh - 60px);
   min-width: 500px;
-  padding-top: 0px;
   padding: 12px;
+  padding-top: 0px;
   position: relative;
 `;
 
@@ -311,7 +311,7 @@ function Popup() {
           </>
         )}
         {(isGoogleSearchPage && links.length < 1) && (
-          <ul style={{ height: '200px', overflow: 'auto' }}>
+          <ul style={{ height: 'calc(100vh - 200px)', overflow: 'auto' }}>
             {logs.map((log, index) => (
               <Item
                 // eslint-disable-next-line react/no-array-index-key
@@ -332,4 +332,5 @@ function Popup() {
   );
 }
 
-ReactDOM.render(<React.StrictMode><Popup /></React.StrictMode>, document.getElementById('root'));
+const root = createRoot(document.getElementById('root'));
+root.render(<React.StrictMode><Popup /></React.StrictMode>);

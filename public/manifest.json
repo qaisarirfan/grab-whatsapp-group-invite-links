@@ -3,7 +3,7 @@
 
   "name": "Grab WhatsApp groups links",
   "description": "Grab WhatsApp groups links",
-  "version": "2.0",
+  "version": "3.0.0",
 
   "action": {
     "default_icon": {
