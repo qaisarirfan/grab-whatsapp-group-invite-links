@@ -3,7 +3,7 @@
 
   "name": "Grab WhatsApp groups links",
   "description": "Grab WhatsApp groups links",
-  "version": "3.0.0",
+  "version": "4.0.0",
 
   "action": {
     "default_icon": {
@@ -27,13 +27,7 @@
     "type": "module"
   },
 
-  "permissions": [
-    "activeTab",
-    "scripting"
-  ],
+  "permissions": ["activeTab", "scripting"],
 
-  "host_permissions": [
-    "https://*/*",
-    "http://*/*"
-  ]
+  "host_permissions": ["https://*/*", "http://*/*"]
 }
