@@ -1,7 +1,6 @@
-import React, { useState } from "react";
-import styled from "styled-components";
-import PropTypes from "prop-types";
-import { convertToCsv, copyToClipboard } from "../utils";
+import { useState } from 'react';
+import { styled } from 'styled-components';
+import { convertToCsv, copyToClipboard } from '../utils';
 
 const ActionsContainer = styled.div`
   align-items: center;
@@ -18,7 +17,14 @@ const ActionsContainer = styled.div`
   top: 0;
 `;
 
-function Actions({ isGoogleSearchPage, isLoading, links, onFetch }) {
+interface PropTypes {
+  isGoogleSearchPage: boolean;
+  isLoading: boolean;
+  links: string[];
+  onFetch: VoidFunction;
+}
+
+function Actions({ isGoogleSearchPage, isLoading, links, onFetch }: PropTypes) {
   const [hasCopyAsJSON, setHasCopyAsJSON] = useState(false);
   const [isCopyAsJSON, setIsCopyAsJSON] = useState(false);
   const [hasCopyAsText, setHasCopyAsText] = useState(false);
@@ -30,8 +36,8 @@ function Actions({ isGoogleSearchPage, isLoading, links, onFetch }) {
     onFetch();
   };
 
-  const handleCopy = async (format) => {
-    const isTextFormat = format === "text";
+  const handleCopy = async (format: string) => {
+    const isTextFormat = format === 'text';
 
     setHasCopyAsJSON(false);
     setHasCopyAsText(false);
@@ -43,7 +49,7 @@ function Actions({ isGoogleSearchPage, isLoading, links, onFetch }) {
     }
 
     try {
-      const content = isTextFormat ? links.join("\r\n") : JSON.stringify(links);
+      const content = isTextFormat ? links.join('\r\n') : JSON.stringify(links);
       await copyToClipboard(content);
 
       if (isTextFormat) {
@@ -53,7 +59,7 @@ function Actions({ isGoogleSearchPage, isLoading, links, onFetch }) {
         setIsCopyAsJSON(false);
         setHasCopyAsJSON(true);
       }
-    } catch (error) {
+    } catch {
       if (isTextFormat) {
         setIsCopyAsText(false);
         setHasCopyAsText(false);
@@ -64,29 +70,23 @@ function Actions({ isGoogleSearchPage, isLoading, links, onFetch }) {
     }
   };
 
-  const buttonClasses = [
-    "size-small",
-    "shadow-hard",
-    "bg-blue",
-    "text-white",
-    "with-loader",
-  ];
+  const buttonClasses = ['size-small', 'shadow-hard', 'bg-blue', 'text-white', 'with-loader'];
   let copyAsTextButton = [...buttonClasses];
   if (!isCopyAsText) {
-    copyAsTextButton = copyAsTextButton.filter((val) => val !== "with-loader");
+    copyAsTextButton = copyAsTextButton.filter(val => val !== 'with-loader');
   }
   if (hasCopyAsText) {
-    copyAsTextButton = copyAsTextButton.filter((val) => val !== "bg-blue");
-    copyAsTextButton.push("bg-green");
+    copyAsTextButton = copyAsTextButton.filter(val => val !== 'bg-blue');
+    copyAsTextButton.push('bg-green');
   }
 
   let copyAsJSONButton = [...buttonClasses];
   if (!isCopyAsJSON) {
-    copyAsJSONButton = copyAsJSONButton.filter((val) => val !== "with-loader");
+    copyAsJSONButton = copyAsJSONButton.filter(val => val !== 'with-loader');
   }
   if (hasCopyAsJSON) {
-    copyAsJSONButton = copyAsJSONButton.filter((val) => val !== "bg-blue");
-    copyAsJSONButton.push("bg-green");
+    copyAsJSONButton = copyAsJSONButton.filter(val => val !== 'bg-blue');
+    copyAsJSONButton.push('bg-green');
   }
   return (
     <ActionsContainer>
@@ -94,50 +94,33 @@ function Actions({ isGoogleSearchPage, isLoading, links, onFetch }) {
       <div>
         {isGoogleSearchPage && links.length > 0 && (
           <button
-            className={`size-small bg-yellow shadow-hard ${isLoading && "with-loader"}`}
+            className={`size-small bg-yellow shadow-hard ${isLoading && 'with-loader'}`}
             type="button"
             onClick={onFetchHandler}
-            disabled={isLoading}
-          >
+            disabled={isLoading}>
             Extract again
           </button>
         )}
-        <button
-          className={copyAsTextButton.join(" ")}
-          type="button"
-          onClick={() => handleCopy("text")}
-        >
-          {`${hasCopyAsText ? "Copied" : "Copy"} as Text`}
+        <button className={copyAsTextButton.join(' ')} type="button" onClick={() => handleCopy('text')}>
+          {`${hasCopyAsText ? 'Copied' : 'Copy'} as Text`}
         </button>
-        <button
-          className={copyAsJSONButton.join(" ")}
-          type="button"
-          onClick={() => handleCopy("json")}
-        >
-          {`${hasCopyAsJSON ? "Copied" : "Copy"} as JSON`}
+        <button className={copyAsJSONButton.join(' ')} type="button" onClick={() => handleCopy('json')}>
+          {`${hasCopyAsJSON ? 'Copied' : 'Copy'} as JSON`}
         </button>
         <button
           type="button"
           className="size-small shadow-hard bg-cyan"
           onClick={() =>
             convertToCsv(
-              links.map((link) => ({ Links: link })),
-              "links",
+              links.map(link => ({ Links: link })),
+              'links',
             )
-          }
-        >
+          }>
           Download csv
         </button>
       </div>
     </ActionsContainer>
   );
 }
-
-Actions.propTypes = {
-  isGoogleSearchPage: PropTypes.bool.isRequired,
-  isLoading: PropTypes.bool.isRequired,
-  links: PropTypes.arrayOf(PropTypes.string).isRequired,
-  onFetch: PropTypes.func.isRequired,
-};
 
 export default Actions;

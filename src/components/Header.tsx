@@ -1,5 +1,4 @@
-import React from "react";
-import styled from "styled-components";
+import { styled } from 'styled-components';
 
 const StyledHeader = styled.header`
   align-items: center;
@@ -46,15 +45,8 @@ function Header() {
       </div>
       <div className="buymeacoffee">
         <p>Support me on</p>
-        <a
-          href="https://www.buymeacoffee.com/qaisarirfan"
-          target="_blank"
-          rel="noreferrer"
-        >
-          <img
-            src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"
-            alt="Buy Me A Coffee"
-          />
+        <a href="https://www.buymeacoffee.com/qaisarirfan" target="_blank" rel="noreferrer">
+          <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" />
         </a>
       </div>
     </StyledHeader>

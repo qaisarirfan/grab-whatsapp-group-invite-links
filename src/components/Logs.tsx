@@ -1,7 +1,5 @@
-import PropTypes from "prop-types";
-import React from "react";
-import styled from "styled-components";
-import { convertToCsv } from "../utils";
+import { styled } from 'styled-components';
+import { convertToCsv } from '../utils';
 
 const ActionBar = styled.div`
   align-items: center;
@@ -17,17 +15,30 @@ const Loader = styled.div`
   width: 20px;
 `;
 
-function Logs({ logs, progress, isLoading }) {
+type Log = {
+  origin: string;
+  href: string;
+  count: number;
+  errorMessage: string | null;
+  hasError: boolean;
+};
+
+interface Props {
+  progress: string;
+  isLoading: boolean;
+  logs: Log[];
+}
+
+function Logs({ logs, progress, isLoading }: Props) {
   return (
     <>
       <ActionBar>
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-          }}
-        >
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+          }}>
           <p>{progress}</p>
           {isLoading && <Loader className="with-loader bg-grey" />}
         </div>
@@ -37,15 +48,14 @@ function Logs({ logs, progress, isLoading }) {
           className="size-small shadow-hard bg-cyan"
           onClick={() =>
             convertToCsv(
-              logs.map((log) => ({
+              logs.map(log => ({
                 Total: log.count,
                 Error: log.errorMessage,
                 Link: log.href,
               })),
-              "logs",
+              'logs',
             )
-          }
-        >
+          }>
           Download csv
         </button>
       </ActionBar>
@@ -64,7 +74,7 @@ function Logs({ logs, progress, isLoading }) {
                   {log?.origin}
                 </a>
               </td>
-              <td style={{ color: log?.hasError ? "red" : "inherit" }}>
+              <td style={{ color: log?.hasError ? 'red' : 'inherit' }}>
                 {log?.count > 0 && <p>{`finds ${log?.count} links`}</p>}
                 {log?.errorMessage && <span>{log?.errorMessage}</span>}
               </td>
@@ -75,19 +85,5 @@ function Logs({ logs, progress, isLoading }) {
     </>
   );
 }
-
-Logs.propTypes = {
-  progress: PropTypes.string.isRequired,
-  isLoading: PropTypes.bool.isRequired,
-  logs: PropTypes.arrayOf(
-    PropTypes.shape({
-      origin: PropTypes.string,
-      href: PropTypes.string,
-      count: PropTypes.number,
-      errorMessage: PropTypes.string,
-      hasError: PropTypes.bool,
-    }),
-  ).isRequired,
-};
 
 export default Logs;

@@ -1,18 +1,18 @@
-const path = require("path");
-const CopyPlugin = require("copy-webpack-plugin");
-const TerserPlugin = require("terser-webpack-plugin");
-const { BundleAnalyzerPlugin } = require("webpack-bundle-analyzer");
+const path = require('path');
+const CopyPlugin = require('copy-webpack-plugin');
+const TerserPlugin = require('terser-webpack-plugin');
+const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 
-const srcDir = path.join(__dirname, "..", "src");
+const srcDir = path.resolve('src');
 
 module.exports = {
   entry: {
-    background: path.join(srcDir, "background.js"),
-    popup: path.join(srcDir, "popup.js"),
+    background: path.join(srcDir, 'background.ts'),
+    popup: path.join(srcDir, 'popup.tsx'),
   },
   output: {
-    path: path.join(__dirname, "../dist/js"),
-    filename: "[name].js",
+    path: path.join(__dirname, 'dist/js'),
+    filename: '[name].js',
     clean: true,
   },
   watchOptions: {
@@ -33,21 +33,21 @@ module.exports = {
       }),
     ],
     splitChunks: {
-      chunks: "all",
+      chunks: 'all',
       maxInitialRequests: 10,
       maxAsyncRequests: 10,
       minSize: 20000,
       cacheGroups: {
         vendor: {
           test: /[\\/]node_modules[\\/]/,
-          name: "vendors",
-          chunks: "all",
+          name: 'vendors',
+          chunks: 'all',
           priority: -10,
         },
         common: {
-          name: "common",
+          name: 'common',
           minChunks: 2,
-          chunks: "all",
+          chunks: 'all',
           priority: -20,
         },
       },
@@ -55,34 +55,44 @@ module.exports = {
   },
   module: {
     rules: [
+      // {
+      //   test: /\.(js|jsx)$/,
+      //   exclude: /node_modules/,
+      //   use: {
+      //     loader: 'babel-loader',
+      //     options: {
+      //       presets: [['@babel/preset-env', { targets: '> 0.25%, not dead' }]],
+      //       plugins: ['@babel/plugin-syntax-dynamic-import'],
+      //     },
+      //   },
+      // },
       {
-        test: /\.(js|jsx)$/,
-        exclude: /node_modules/,
+        test: /\.(ts|tsx)?$/,
         use: {
-          loader: "babel-loader",
+          loader: 'ts-loader',
           options: {
-            presets: [["@babel/preset-env", { targets: "> 0.25%, not dead" }]],
-            plugins: ["@babel/plugin-syntax-dynamic-import"],
+            logLevel: 'info',
           },
         },
+        exclude: /node_modules/,
       },
     ],
   },
   resolve: {
-    extensions: ["*", ".js", ".jsx"],
+    extensions: ['.ts', '.tsx', '.js', '.jsx'],
   },
   plugins: [
     new CopyPlugin({
-      patterns: [{ from: ".", to: "../", context: "public" }],
+      patterns: [{ from: '.', to: '../', context: 'public' }],
     }),
     new BundleAnalyzerPlugin({
-      analyzerMode: "static",
+      analyzerMode: 'static',
       openAnalyzer: false,
     }),
   ],
   performance: {
     maxAssetSize: 300000,
     maxEntrypointSize: 500000,
-    hints: "warning",
+    hints: 'warning',
   },
 };
