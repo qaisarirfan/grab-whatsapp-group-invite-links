@@ -12,7 +12,16 @@
     "editor.formatOnSave": false
   },
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": "explicit"
+    "source.fixAll.eslint": "always",
+    "source.fixAll.ts": "always",
+    "source.organizeImports": "always",
+    "source.addMissingImports.ts": "always",
+    "source.removeUnused.ts": "always",
+    "source.removeUnusedImports": "always",
+    "source.sortImports": "always"
   },
-  "editor.formatOnSaveMode": "modifications"
+  "editor.formatOnSaveMode": "modificationsIfAvailable",
+  "prettier.printWidth": 140,
+  "yaml.format.printWidth": 140,
+  "editor.defaultFormatter": "esbenp.prettier-vscode"
 }

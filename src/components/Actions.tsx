@@ -1,6 +1,9 @@
 import { useState } from 'react';
+
 import { styled } from 'styled-components';
-import { convertToCsv, copyToClipboard } from '../utils';
+
+import Analytics from '@src/analytics';
+import { convertToCsv, copyToClipboard } from '@src/utils';
 
 const ActionsContainer = styled.div`
   align-items: center;
@@ -37,6 +40,7 @@ function Actions({ isGoogleSearchPage, isLoading, links, onFetch }: PropTypes) {
   };
 
   const handleCopy = async (format: string) => {
+    Analytics.fireEvent(`${format}_link_copied`, { total: links.length });
     const isTextFormat = format === 'text';
 
     setHasCopyAsJSON(false);
@@ -110,12 +114,13 @@ function Actions({ isGoogleSearchPage, isLoading, links, onFetch }: PropTypes) {
         <button
           type="button"
           className="size-small shadow-hard bg-cyan"
-          onClick={() =>
+          onClick={() => {
+            Analytics.fireEvent('links_downloaded', { total: links.length });
             convertToCsv(
               links.map(link => ({ Links: link })),
-              'links',
-            )
-          }>
+              'links'
+            );
+          }}>
           Download csv
         </button>
       </div>

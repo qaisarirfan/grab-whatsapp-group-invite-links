@@ -11,8 +11,9 @@
     "plugin:@typescript-eslint/recommended",
     "plugin:react-hooks/recommended",
     "plugin:import/recommended",
+    "plugin:import/typescript", // Add TypeScript support for import plugin
     "plugin:jsx-a11y/recommended",
-    "prettier",
+    "plugin:prettier/recommended",
   ],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
@@ -21,18 +22,83 @@
     },
     "ecmaVersion": "latest",
     "sourceType": "module",
+    "project": "./tsconfig.json", // Add this to enable TypeScript project resolution
   },
-  "plugins": ["react", "@typescript-eslint", "react-hooks", "import", "jsx-a11y", "prettier"],
+  "plugins": ["react", "@typescript-eslint", "react-hooks", "import", "jsx-a11y", "prettier", "unused-imports"],
   "settings": {
     "react": {
       "version": "detect",
     },
+    "import/resolver": {
+      "typescript": {
+        "alwaysTryTypes": true, // Improve TypeScript import resolution
+        "project": "./tsconfig.json", // Point to your tsconfig.json
+      },
+    },
   },
   "rules": {
-    "react/react-in-jsx-scope": "off",
-    "import/no-unresolved": "off",
-    "@typescript-eslint/consistent-type-imports": "error",
-    "prettier/prettier": ["error"],
+    // Prettier rules
+    "prettier/prettier": "error",
+
+    // React rules
+    "react/react-in-jsx-scope": "off", // Not needed in React 17+
+    "react/prop-types": "off", // Disable prop-types (use TypeScript instead)
+
+    // Import rules
+    "import/no-unresolved": "error", // Ensure all imports are resolved
+    "import/order": [
+      "error",
+      {
+        "groups": [
+          "builtin", // Built-in modules (e.g., 'react')
+          "external", // External dependencies (e.g., 'lodash')
+          "internal", // Internal aliases (e.g., '@src/utils')
+          "parent", // Parent directory imports
+          "sibling", // Sibling directory imports
+          "index", // Index file imports
+        ],
+        "newlines-between": "always", // Add newlines between groups
+        "alphabetize": {
+          "order": "asc",
+          "caseInsensitive": true,
+          "orderImportKind": "asc",
+        },
+        "pathGroups": [
+          {
+            "group": "builtin",
+            "pattern": "react**",
+            "position": "before",
+          },
+          {
+            "group": "internal",
+            "pattern": "@components/**",
+            "position": "after",
+          },
+          {
+            "group": "internal",
+            "pattern": "@src/**",
+            "position": "after",
+          },
+        ],
+        "pathGroupsExcludedImportTypes": [],
+        "distinctGroup": true,
+      },
+    ],
+    "import/no-duplicates": "error", // Prevent duplicate imports
+
+    // TypeScript rules
+    "@typescript-eslint/consistent-type-imports": "error", // Enforce type imports
+    "@typescript-eslint/no-unused-vars": "warn", // Warn on unused variables
+    "@typescript-eslint/no-explicit-any": "warn", // Warn on `any` type usage
+
+    // Unused imports
+    "unused-imports/no-unused-imports": "error", // Error on unused imports
+
+    // General rules
+    "no-console": "warn", // Warn on `console` usage
+    "no-unused-vars": "off", // Disable ESLint's default rule (use TypeScript's rule instead)
+    "react-hooks/rules-of-hooks": "error", // Enforce React Hooks rules
+    "react-hooks/exhaustive-deps": "warn", // Warn on missing dependencies in useEffect
   },
   "globals": {
     "chrome": "readonly",

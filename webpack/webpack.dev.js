@@ -4,4 +4,8 @@ const common = require('./webpack.common.js');
 module.exports = merge(common, {
   devtool: 'inline-source-map',
   mode: 'development',
+  devServer: {
+    static: './dist',
+    hot: true, // Enable Hot Module Replacement (HMR)
+  },
 });

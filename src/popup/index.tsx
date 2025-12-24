@@ -1,15 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+
+import { isAxiosError } from 'axios';
+import pLimit from 'p-limit';
 import { createRoot } from 'react-dom/client';
 import { styled } from 'styled-components';
-import pLimit from 'p-limit';
 
-import { extractWhatsappLinks, fetchData, handleError, inviteLink, isGoogle, parseUrl } from './utils';
-import Links from './components/Links';
-import Header from './components/Header';
-import Logs from './components/Logs';
-import { GOOGLE_SEARCH_URL } from './constants';
-import Tab from './components/Tabs';
-import { isAxiosError } from 'axios';
+import Header from '@components/Header';
+import Links from '@components/Links';
+import Logs from '@components/Logs';
+import Tab from '@components/Tabs';
+
+import Analytics from '@src/analytics';
+import { GOOGLE_SEARCH_URL } from '@src/constants';
+import { extractWhatsappLinks, fetchData, handleError, inviteLink, isGoogle, parseUrl } from '@src/utils';
 
 const Container = styled.div`
   max-width: 650px;
@@ -48,14 +51,10 @@ function Popup() {
 
   const isGoogleSearchPage = isGoogle(currentURL);
 
-  const searchLinks = useMemo(
-    () => googleSearchLinks.filter(val => !val.includes(GOOGLE_SEARCH_URL)),
-    [googleSearchLinks],
-  );
+  const searchLinks = useMemo(() => googleSearchLinks.filter(val => !val.includes(GOOGLE_SEARCH_URL)), [googleSearchLinks]);
 
   const getAllAnchorTags = () => {
-    const isGoogleSearch =
-      `${window?.location?.origin}${window?.location?.pathname}` === 'https://www.google.com/search';
+    const isGoogleSearch = `${window?.location?.origin}${window?.location?.pathname}` === 'https://www.google.com/search';
 
     let tags = document.querySelectorAll('a');
     if (isGoogleSearch) {
@@ -64,9 +63,7 @@ function Popup() {
     const ls = [];
     for (let idx = 0; idx < tags.length; idx += 1) {
       const value = tags[idx];
-      const res = value.href.match(
-        /(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)/g,
-      );
+      const res = value.href.match(/(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)/g);
       if (res !== null) {
         ls.push(value.href);
       }
@@ -75,21 +72,33 @@ function Popup() {
   };
 
   useEffect(() => {
+    Analytics.fireEvent('extension_loaded');
+
     chrome.tabs.query({ active: true, windowId: chrome.windows.WINDOW_ID_CURRENT }, tabs => {
-      const { url, id } = tabs[0];
+      const { url, id, title } = tabs[0];
+      Analytics.firePageViewEvent(title ?? '', url ?? '');
+
       if (!id) return;
       setCurrentURL(url);
+      Analytics.fireEvent('page_type_detected', {
+        is_google: isGoogle(url),
+        url,
+      });
       chrome.scripting.executeScript(
         {
           target: { tabId: id },
           func: getAllAnchorTags,
         },
         injectionResults => {
+          Analytics.fireEvent('dom_links_extracted', {
+            total_links_found: injectionResults?.[0]?.result?.length ?? 0,
+          });
           let linksFrom: string[] = [];
           injectionResults?.forEach(({ result }) => {
             linksFrom = [...linksFrom, ...(result ?? [])];
           });
           if (!isGoogle(url)) {
+            Analytics.fireEvent('non_google_page_detected');
             const whatsappLink = linksFrom.map(val => inviteLink(val)).filter(val => val.length > 0);
             if (whatsappLink.length > 0) {
               setLinks([...new Set(whatsappLink)]);
@@ -97,14 +106,20 @@ function Popup() {
               setOtherLinks([...new Set(linksFrom)]);
             }
           } else {
+            Analytics.fireEvent('google_search_page_detected');
             setGoogleSearchLinks([...new Set(linksFrom)]);
           }
-        },
+        }
       );
     });
   }, []);
 
   const logResults = (log: Log, waLinks: string[]) => {
+    Analytics.fireEvent('log_recorded', {
+      origin: log.origin,
+      has_error: log.hasError,
+      count: waLinks.length,
+    });
     setLogs(prevState => [
       ...prevState,
       {
@@ -115,6 +130,8 @@ function Popup() {
   };
 
   const getWhatsappLink = async (val: string) => {
+    Analytics.fireEvent('page_fetch_initiated', { target_url: val });
+
     const waLinks = [];
     const tmpLog = {
       count: 0,
@@ -127,8 +144,16 @@ function Popup() {
       const { data } = await fetchData(val);
       const extractedLinks = extractWhatsappLinks(data);
       waLinks.push(...extractedLinks);
+      Analytics.fireEvent('page_fetch_success', {
+        target_url: val,
+        extracted_links: extractedLinks.length,
+      });
     } catch (error) {
       if (isAxiosError(error)) {
+        Analytics.fireErrorEvent({
+          target_url: val,
+          error: error.message,
+        });
         Object.assign(tmpLog, handleError(error.message));
       }
     }
@@ -137,11 +162,13 @@ function Popup() {
   };
 
   const fetchAll = async () => {
+    Analytics.fireEvent('fetch_started', { total_targets: searchLinks.length });
     ref.current = true;
     setCurrentTab('logs');
     const limit = pLimit(50); // Allow up to 50 concurrent requests
     setLinks([]);
     setLoading(true);
+    Analytics.fireEvent('loading_started');
     setLogs([]);
     let store: string[] = [];
 
@@ -157,6 +184,13 @@ function Popup() {
       });
       const uniqueLinks = [...new Set(store)];
       setLinks(uniqueLinks);
+      Analytics.fireEvent('fetch_completed', {
+        total_results: uniqueLinks.length,
+      });
+      Analytics.fireEvent('loading_finished');
+      if (uniqueLinks.length === 0) {
+        Analytics.fireEvent('no_links_found', { page: currentURL });
+      }
     } finally {
       setLoading(false);
       setCurrentTab('links');
@@ -188,14 +222,13 @@ function Popup() {
               { name: 'Links', key: 'links' },
             ]}
             currentSelected={currentTab}
-            onTabSelected={tab => setCurrentTab(tab)}
+            onTabSelected={tab => {
+              Analytics.fireEvent('tab_changed', { tab });
+              setCurrentTab(tab);
+            }}
           />
-          {currentTab === 'links' && (
-            <Links links={links} fetchAll={fetchAll} isLoading={isLoading} isGoogleSearch={isGoogleSearchPage} />
-          )}
-          {currentTab === 'logs' && (
-            <Logs logs={logs.reverse()} isLoading={isLoading} progress={`${logs.length}/${searchLinks.length}`} />
-          )}
+          {currentTab === 'links' && <Links links={links} fetchAll={fetchAll} isLoading={isLoading} isGoogleSearch={isGoogleSearchPage} />}
+          {currentTab === 'logs' && <Logs logs={logs.reverse()} isLoading={isLoading} progress={`${logs.length}/${searchLinks.length}`} />}
         </>
       )}
       {!isGoogleSearchPage && links.length > 0 && (
@@ -215,7 +248,13 @@ function Popup() {
             <ExtractButton
               className={`shape-rounded bg-yellow shadow-hard ${isLoading && 'with-loader'}`}
               type="button"
-              onClick={fetchAll}
+              onClick={() => {
+                Analytics.fireEvent('extract_clicked', {
+                  page: currentURL,
+                  google_links: searchLinks.length,
+                });
+                fetchAll();
+              }}
               disabled={isLoading}>
               Extract {logs.length > 0 && links.length === 0 ? 'again' : null}
             </ExtractButton>
@@ -232,6 +271,6 @@ if (container) {
   root.render(
     <React.StrictMode>
       <Popup />
-    </React.StrictMode>,
+    </React.StrictMode>
   );
 }

@@ -1,33 +1,19 @@
 {
   "compilerOptions": {
-    "target": "ES2020", // Compatible with modern tools
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ES2020", // Aligned with `target`
-    "skipLibCheck": true,
-
-    /* Bundler mode */
-    "moduleResolution": "node",
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx", // Ensure this aligns with React version
-
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-
-    /* Output directories */
-    "outDir": "./out/js",
+    "outDir": "./dist",
     "rootDir": "./src",
+    "module": "ESNext",
+    "target": "ES6",
+    "moduleResolution": "node",
     "esModuleInterop": true,
+    "strict": true,
     "sourceMap": true,
-    "allowJs": true,
-    "allowSyntheticDefaultImports": true,
-    "downlevelIteration": true // Fix issues when using spread with iterators
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@components/*": ["./src/components/*"],
+      "@src/*": ["./src/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules"]

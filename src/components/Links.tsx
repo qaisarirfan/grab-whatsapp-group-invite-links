@@ -1,4 +1,5 @@
 import { styled } from 'styled-components';
+
 import Actions from './Actions';
 
 const Loader = styled.div`

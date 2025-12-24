@@ -1,5 +1,6 @@
 import { styled } from 'styled-components';
-import { convertToCsv } from '../utils';
+
+import { convertToCsv } from '@src/utils';
 
 const ActionBar = styled.div`
   align-items: center;
@@ -53,7 +54,7 @@ function Logs({ logs, progress, isLoading }: Props) {
                 Error: log.errorMessage,
                 Link: log.href,
               })),
-              'logs',
+              'logs'
             )
           }>
           Download csv

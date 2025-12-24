@@ -2,17 +2,20 @@ const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
 
 const srcDir = path.resolve('src');
 
 module.exports = {
   entry: {
     background: path.join(srcDir, 'background.ts'),
-    popup: path.join(srcDir, 'popup.tsx'),
+    popup: path.join(srcDir, 'popup/index.tsx'),
   },
   output: {
-    path: path.join(__dirname, 'dist/js'),
-    filename: '[name].js',
+    path: path.join(__dirname, '../dist'),
+    filename: 'js/[name].js',
     clean: true,
   },
   watchOptions: {
@@ -20,6 +23,10 @@ module.exports = {
     ignored: /node_modules/,
   },
   optimization: {
+    sideEffects: false,
+    concatenateModules: true,
+    runtimeChunk: false,
+    moduleIds: 'deterministic',
     usedExports: true,
     minimize: true,
     minimizer: [
@@ -34,56 +41,54 @@ module.exports = {
     ],
     splitChunks: {
       chunks: 'all',
-      maxInitialRequests: 10,
-      maxAsyncRequests: 10,
-      minSize: 20000,
       cacheGroups: {
-        vendor: {
+        react: {
+          test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+          name: 'react',
+          priority: 30,
+        },
+        vendors: {
           test: /[\\/]node_modules[\\/]/,
           name: 'vendors',
-          chunks: 'all',
-          priority: -10,
-        },
-        common: {
-          name: 'common',
-          minChunks: 2,
-          chunks: 'all',
-          priority: -20,
+          priority: 20,
         },
       },
     },
   },
   module: {
     rules: [
-      // {
-      //   test: /\.(js|jsx)$/,
-      //   exclude: /node_modules/,
-      //   use: {
-      //     loader: 'babel-loader',
-      //     options: {
-      //       presets: [['@babel/preset-env', { targets: '> 0.25%, not dead' }]],
-      //       plugins: ['@babel/plugin-syntax-dynamic-import'],
-      //     },
-      //   },
-      // },
       {
-        test: /\.(ts|tsx)?$/,
+        test: /\.(ts|tsx|js|jsx)$/,
+        exclude: /node_modules/,
         use: {
-          loader: 'ts-loader',
+          loader: 'babel-loader',
           options: {
-            logLevel: 'info',
+            presets: [
+              ['@babel/preset-env', { modules: false }],
+              ['@babel/preset-react', { runtime: 'automatic' }],
+              '@babel/preset-typescript',
+            ],
+            plugins: ['@babel/plugin-syntax-dynamic-import'],
           },
         },
-        exclude: /node_modules/,
       },
     ],
   },
   resolve: {
     extensions: ['.ts', '.tsx', '.js', '.jsx'],
+    plugins: [
+      new TsconfigPathsPlugin(), // Add this to resolve paths from tsconfig.json
+    ],
   },
   plugins: [
+    new CleanWebpackPlugin(), // Cleans the `dist` folder before each build
+    new HtmlWebpackPlugin({
+      template: path.join(srcDir, 'popup/index.html'), // Popup HTML template
+      filename: 'popup.html',
+      chunks: ['popup'], // Only include the popup script
+    }),
     new CopyPlugin({
-      patterns: [{ from: '.', to: '../', context: 'public' }],
+      patterns: [{ from: '.', to: '../dist', context: 'public' }],
     }),
     new BundleAnalyzerPlugin({
       analyzerMode: 'static',

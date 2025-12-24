@@ -1,7 +1,7 @@
+import { StreamParser } from '@json2csv/plainjs';
 import axios from 'axios';
 import Bottleneck from 'bottleneck';
 import { load } from 'cheerio';
-import { StreamParser } from '@json2csv/plainjs';
 
 export const inviteLink = (link: string | undefined) => {
   if (!link) return '';
@@ -16,9 +16,7 @@ export const inviteLink = (link: string | undefined) => {
 };
 
 export const isValidURL = (string: string) => {
-  const res = string.match(
-    /(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)/g,
-  );
+  const res = string.match(/(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)/g);
   return res !== null;
 };
 
