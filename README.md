@@ -33,7 +33,6 @@ As a Principal Software Engineer with 12 years of industry experience, I strive 
 
 * Webpack
 * React
-* Jest
 
 ## Setup
 
@@ -64,6 +63,3 @@ type `Ctrl + Shift + B`
 ## Load extension to chrome
 
 Load `dist` directory
-
-## Test
-`npx jest` or `npm run test`
