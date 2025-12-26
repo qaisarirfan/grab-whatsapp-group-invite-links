@@ -13,6 +13,7 @@ import Tab from '@components/Tabs';
 import Analytics from '@src/analytics';
 import { GOOGLE_SEARCH_URL } from '@src/constants';
 import { extractWhatsappLinks, fetchData, handleError, inviteLink, isGoogle, parseUrl } from '@src/utils';
+import { validateMultipleLinks } from '@src/validation';
 
 const Container = styled.div`
   max-width: 650px;
@@ -44,6 +45,7 @@ function Popup() {
   const [currentURL, setCurrentURL] = useState<string | undefined>();
   const [googleSearchLinks, setGoogleSearchLinks] = useState<string[]>([]);
   const [isLoading, setLoading] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
   const [links, setLinks] = useState<string[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
   const [otherLinks, setOtherLinks] = useState<string[]>([]);
@@ -197,6 +199,24 @@ function Popup() {
     }
   };
 
+  const validateAllLinks = async () => {
+    Analytics.fireEvent('validate_links_started', { total_links: links.length });
+    setIsValidating(true);
+    try {
+      await validateMultipleLinks(links);
+      Analytics.fireEvent('validate_links_completed', { total_links: links.length });
+      // Trigger a re-render of the links component by updating state
+      setLinks([...links]);
+    } catch (error) {
+      Analytics.fireErrorEvent({
+        context: 'validate_links_error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
   const nonGoogleMessage = [
     'There is no WhatsApp group link on this page',
     otherLinks.length > 0 ? ` but you found ${otherLinks.length} other links. ` : '. ',
@@ -227,12 +247,12 @@ function Popup() {
               setCurrentTab(tab);
             }}
           />
-          {currentTab === 'links' && <Links links={links} fetchAll={fetchAll} isLoading={isLoading} isGoogleSearch={isGoogleSearchPage} />}
+          {currentTab === 'links' && <Links links={links} fetchAll={fetchAll} isLoading={isLoading} isGoogleSearch={isGoogleSearchPage} onValidateAll={validateAllLinks} isValidating={isValidating} />}
           {currentTab === 'logs' && <Logs logs={logs.reverse()} isLoading={isLoading} progress={`${logs.length}/${searchLinks.length}`} />}
         </>
       )}
       {!isGoogleSearchPage && links.length > 0 && (
-        <Links links={links} fetchAll={fetchAll} isLoading={isLoading} isGoogleSearch={isGoogleSearchPage} />
+        <Links links={links} fetchAll={fetchAll} isLoading={isLoading} isGoogleSearch={isGoogleSearchPage} onValidateAll={validateAllLinks} isValidating={isValidating} />
       )}
       {!isGoogleSearchPage && links.length < 1 && (
         <>

@@ -10,8 +10,9 @@ const ActionsContainer = styled.div`
   background: #fff;
   display: flex;
   flex-direction: row;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: space-between;
+  gap: 8px;
   left: 12px;
   padding-bottom: 12px;
   padding-top: 12px;
@@ -25,9 +26,11 @@ interface PropTypes {
   isLoading: boolean;
   links: string[];
   onFetch: VoidFunction;
+  onValidateAll?: VoidFunction;
+  isValidating?: boolean;
 }
 
-function Actions({ isGoogleSearchPage, isLoading, links, onFetch }: PropTypes) {
+function Actions({ isGoogleSearchPage, isLoading, links, onFetch, onValidateAll, isValidating }: PropTypes) {
   const [hasCopyAsJSON, setHasCopyAsJSON] = useState(false);
   const [isCopyAsJSON, setIsCopyAsJSON] = useState(false);
   const [hasCopyAsText, setHasCopyAsText] = useState(false);
@@ -37,6 +40,13 @@ function Actions({ isGoogleSearchPage, isLoading, links, onFetch }: PropTypes) {
     setHasCopyAsJSON(false);
     setHasCopyAsText(false);
     onFetch();
+  };
+
+  const onValidateHandler = () => {
+    if (onValidateAll) {
+      Analytics.fireEvent('validate_all_clicked', { total_links: links.length });
+      onValidateAll();
+    }
   };
 
   const handleCopy = async (format: string) => {
@@ -95,7 +105,7 @@ function Actions({ isGoogleSearchPage, isLoading, links, onFetch }: PropTypes) {
   return (
     <ActionsContainer>
       <div>{links.length > 0 && <p>{`Total: ${links.length}`}</p>}</div>
-      <div>
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
         {isGoogleSearchPage && links.length > 0 && (
           <button
             className={`size-small bg-yellow shadow-hard ${isLoading && 'with-loader'}`}
@@ -103,6 +113,15 @@ function Actions({ isGoogleSearchPage, isLoading, links, onFetch }: PropTypes) {
             onClick={onFetchHandler}
             disabled={isLoading}>
             Extract again
+          </button>
+        )}
+        {links.length > 0 && (
+          <button
+            className={`size-small bg-orange shadow-hard ${isValidating && 'with-loader'}`}
+            type="button"
+            onClick={onValidateHandler}
+            disabled={isValidating}>
+            {isValidating ? 'Validating...' : 'Validate links'}
           </button>
         )}
         <button className={copyAsTextButton.join(' ')} type="button" onClick={() => handleCopy('text')}>
