@@ -118,4 +118,4 @@ class Analytics {
   }
 }
 
-export default new Analytics();
+export default new Analytics(true);

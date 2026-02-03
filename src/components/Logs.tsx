@@ -1,3 +1,6 @@
+import type { ReactNode } from 'react';
+
+import { clsx } from 'clsx';
 import { styled } from 'styled-components';
 
 import { convertToCsv } from '@src/utils';
@@ -25,7 +28,7 @@ type Log = {
 };
 
 interface Props {
-  progress: string;
+  progress: ReactNode;
   isLoading: boolean;
   logs: Log[];
 }
@@ -40,7 +43,7 @@ function Logs({ logs, progress, isLoading }: Props) {
             alignItems: 'center',
             gap: '12px',
           }}>
-          <p>{progress}</p>
+          {progress}
           {isLoading && <Loader className="with-loader bg-grey" />}
         </div>
         <button
@@ -71,13 +74,17 @@ function Logs({ logs, progress, isLoading }: Props) {
                 })}
               </td>
               <td>
-                <a target="_blank" href={log?.href} rel="noreferrer">
+                <a target="_blank" href={log?.href} rel="noreferrer" title={log.href}>
                   {log?.origin}
                 </a>
               </td>
-              <td style={{ color: log?.hasError ? 'red' : 'inherit' }}>
-                {log?.count > 0 && <p>{`finds ${log?.count} links`}</p>}
-                {log?.errorMessage && <span>{log?.errorMessage}</span>}
+              <td
+                className={clsx({
+                  'text-green': log?.count > 0,
+                  'text-red': log?.hasError,
+                })}>
+                {!log?.hasError && `finds ${log?.count} links`}
+                {log?.hasError && log?.errorMessage}
               </td>
             </tr>
           ))}

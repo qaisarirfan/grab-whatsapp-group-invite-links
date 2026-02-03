@@ -1,7 +1,5 @@
 import { styled } from 'styled-components';
 
-import Actions from './Actions';
-
 const Loader = styled.div`
   border-radius: 50%;
   height: 20px;
@@ -10,14 +8,12 @@ const Loader = styled.div`
 `;
 
 interface PropTypes {
-  fetchAll: VoidFunction;
-  isGoogleSearch: boolean;
   isLoading: boolean;
   links: string[];
   onValidate: VoidFunction;
 }
 
-function Links({ links, isLoading, fetchAll, isGoogleSearch, onValidate }: PropTypes) {
+function ValidLinks({ links, isLoading, onValidate }: PropTypes) {
   if (isLoading) {
     return (
       <div
@@ -35,7 +31,7 @@ function Links({ links, isLoading, fetchAll, isGoogleSearch, onValidate }: PropT
 
   return (
     <>
-      <Actions isGoogleSearchPage={isGoogleSearch} isLoading={isLoading} links={links} onFetch={fetchAll} onValidate={onValidate} />
+      <button onClick={onValidate}>Re-validate</button>
       <table className="ff-table bordered-rows full-width striped padding-tiny">
         <tbody>
           {links.map((link, index) => (
@@ -46,11 +42,16 @@ function Links({ links, isLoading, fetchAll, isGoogleSearch, onValidate }: PropT
                   minimumIntegerDigits: 3,
                 })}
               </td>
-              <td>
+              {/* <td>
+                <div className="text-small">
+                  {isValid === true && '✅'}
+                  {isValid === false && '❌'}
+                </div>
                 <a className="font-mono text-small" target="_blank" href={link} rel="noreferrer">
                   {link}
+                  <div className="text-grey text-tiny">{name}</div>
                 </a>
-              </td>
+              </td> */}
             </tr>
           ))}
         </tbody>
@@ -59,4 +60,4 @@ function Links({ links, isLoading, fetchAll, isGoogleSearch, onValidate }: PropT
   );
 }
 
-export default Links;
+export default ValidLinks;

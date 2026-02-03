@@ -1,7 +1,8 @@
 import { StreamParser } from '@json2csv/plainjs';
-import axios from 'axios';
-import Bottleneck from 'bottleneck';
 import { load } from 'cheerio';
+
+import { http } from './utils/httpClient';
+import { limiter } from './utils/rateLimiter';
 
 export const inviteLink = (link: string | undefined) => {
   if (!link) return '';
@@ -15,6 +16,19 @@ export const inviteLink = (link: string | undefined) => {
   return '';
 };
 
+export const extractLinks = (text: string) => {
+  const regex = /https:\/\/chat\.whatsapp\.com(?:\/invite)?\/([A-Za-z0-9]{22})/gm;
+  const waLinks: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(text)) !== null) {
+    const link = m[0];
+    if (link) {
+      waLinks.push(link);
+    }
+  }
+  return waLinks;
+};
+
 export const isValidURL = (string: string) => {
   const res = string.match(/(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)/g);
   return res !== null;
@@ -23,7 +37,7 @@ export const isValidURL = (string: string) => {
 export const isGoogle = (location: string | undefined) => {
   if (!location) return false;
   const url = new URL(location);
-  return `${url?.origin}${url?.pathname}` === 'https://www.google.com/search';
+  return url.origin.includes('google') && url.pathname === '/search';
 };
 
 export const copyToClipboard = async (text: string) => {
@@ -41,13 +55,7 @@ export const parseUrl = (val: string) => {
   };
 };
 
-// Configure rate limiter (e.g., 5 requests per second)
-export const limiter = new Bottleneck({
-  maxConcurrent: 50, // Maximum concurrent requests
-  minTime: 200, // Wait 200ms between each request
-});
-
-export const fetchData = async (url: string) => limiter.schedule(() => axios.get(url));
+export const fetchData = async (url: string) => limiter.schedule(() => http.get(url));
 
 export const extractWhatsappLinks = (htmlContent: string) => {
   const waLinks: string[] = [];
@@ -58,7 +66,8 @@ export const extractWhatsappLinks = (htmlContent: string) => {
       waLinks.push(link);
     }
   });
-  return [...new Set(waLinks)];
+  const whatsappLinks = extractLinks(htmlContent).map(inviteLink);
+  return [...new Set(waLinks.concat(whatsappLinks))];
 };
 
 export const handleError = (error: string) => ({
@@ -94,9 +103,10 @@ export const convertToCsv = (data: Record<string, unknown>[], filename: string) 
 };
 
 export default {
-  inviteLink,
-  isValidURL,
-  isGoogle,
   copyToClipboard,
+  extractLinks,
+  inviteLink,
+  isGoogle,
+  isValidURL,
   sleep,
 };

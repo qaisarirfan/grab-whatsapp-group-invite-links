@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { clsx } from 'clsx';
 import { styled } from 'styled-components';
 
 import Analytics from '@src/analytics';
@@ -25,9 +26,10 @@ interface PropTypes {
   isLoading: boolean;
   links: string[];
   onFetch: VoidFunction;
+  onValidate: VoidFunction;
 }
 
-function Actions({ isGoogleSearchPage, isLoading, links, onFetch }: PropTypes) {
+function Actions({ isGoogleSearchPage, isLoading, links, onFetch, onValidate }: PropTypes) {
   const [hasCopyAsJSON, setHasCopyAsJSON] = useState(false);
   const [isCopyAsJSON, setIsCopyAsJSON] = useState(false);
   const [hasCopyAsText, setHasCopyAsText] = useState(false);
@@ -96,9 +98,26 @@ function Actions({ isGoogleSearchPage, isLoading, links, onFetch }: PropTypes) {
     <ActionsContainer>
       <div>{links.length > 0 && <p>{`Total: ${links.length}`}</p>}</div>
       <div>
+        <button
+          className={clsx({
+            'bg-black': true,
+            'shadow-hard': true,
+            'size-small': true,
+            'text-white': true,
+          })}
+          type="button"
+          onClick={onValidate}>
+          Validate
+        </button>
         {isGoogleSearchPage && links.length > 0 && (
           <button
-            className={`size-small bg-yellow shadow-hard ${isLoading && 'with-loader'}`}
+            className={clsx({
+              'bg-yellow': true,
+              'shadow-hard': true,
+              'size-small': true,
+              'text-white': true,
+              'with-loader': isLoading,
+            })}
             type="button"
             onClick={onFetchHandler}
             disabled={isLoading}>
