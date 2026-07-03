@@ -111,7 +111,7 @@ grab-whatsapp-group-invite-links/
 | HTML parsing | cheerio | Extracts links from fetched page HTML |
 | CSV | @json2csv/plainjs | Converts link arrays to downloadable CSV |
 | Analytics | GA4 Measurement Protocol | Anonymous event tracking |
-| Retry | axios-retry | Exponential backoff on rate-limited requests (planned) |
+| Retry | axios-retry | Exponential backoff on 429/network errors during validation |
 | CSS utilities | fictoan.min.css | Tables, loaders, shapes, colours |
 
 ---
@@ -138,12 +138,14 @@ popup opens
 
 ```
 user clicks "Validate links"
-    → validateMultipleLinks(links)
-        → per link: check chrome.storage.local cache (24h TTL)
-        → if stale: fetch HEAD no-cors → infer status from response
-        → write result back to chrome.storage.local
+    → validateMultipleLinksWithProgress(links)
+        → per link: check chrome.storage.local cache (24h TTL + cacheVersion match)
+        → if stale: axios.get() the invite page (axios-retry on 429/network errors)
+            → cheerio reads #main_block h3 (group name) and #main_block img (group icon)
+            → name present → 'valid'; page loads with no name → 'expired'
+        → write result (status, name, iconUrl) back to chrome.storage.local
     → Links component re-reads storage on state change
-    → status badges (Active / Expired / Invalid / Limited) rendered
+    → status badges (Active / Expired / Invalid / Rate-limited) rendered
 ```
 
 ---
@@ -182,7 +184,6 @@ node server.js       # Preview dist/ at http://localhost:5000
 | Plan | Document |
 |---|---|
 | Community & channel link extraction | [plan/feature-community-channel-links.md](../plan/feature-community-channel-links.md) |
-| Deep link validation with group metadata (name, description) | [plan/feature-deep-link-validation.md](../plan/feature-deep-link-validation.md) |
 | Bug fixes and code quality improvements | [plan/improvements.md](../plan/improvements.md) |
 
 ---

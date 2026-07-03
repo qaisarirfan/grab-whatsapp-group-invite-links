@@ -39,7 +39,8 @@ function Logs({ logs, progress, isLoading }: Props) {
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-          }}>
+          }}
+        >
           <p>{progress}</p>
           {isLoading && <Loader className="with-loader bg-grey" />}
         </div>
@@ -49,14 +50,15 @@ function Logs({ logs, progress, isLoading }: Props) {
           className="size-small shadow-hard bg-cyan"
           onClick={() =>
             convertToCsv(
-              logs.map(log => ({
+              logs.map((log) => ({
                 Total: log.count,
                 Error: log.errorMessage,
                 Link: log.href,
               })),
               'logs'
             )
-          }>
+          }
+        >
           Download csv
         </button>
       </ActionBar>

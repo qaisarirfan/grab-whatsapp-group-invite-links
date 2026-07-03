@@ -2,14 +2,13 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "module": "ESNext",
+    "module": "nodenext",
     "target": "ES6",
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "esModuleInterop": true,
     "strict": true,
     "sourceMap": true,
     "jsx": "react-jsx",
-    "baseUrl": ".",
     "paths": {
       "@components/*": ["./src/components/*"],
       "@src/*": ["./src/*"]

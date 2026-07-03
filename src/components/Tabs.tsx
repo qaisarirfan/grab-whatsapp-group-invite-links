@@ -29,7 +29,7 @@ interface Props {
 function Tab({ currentSelected, tabs, onTabSelected }: Props) {
   return (
     <TabContainer>
-      {tabs.map(tab => (
+      {tabs.map((tab) => (
         <StyledTabItem $selected={currentSelected === tab.key} onClick={() => onTabSelected(tab.key)} key={tab.key}>
           {tab.name}
         </StyledTabItem>

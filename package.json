@@ -7,7 +7,9 @@
     "watch": "webpack --config webpack/webpack.dev.js --watch",
     "build": "webpack --config webpack/webpack.prod.js",
     "clean": "rimraf dist*",
-    "style": "prettier . --write"
+    "style": "prettier . --write",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix"
   },
   "author": "",
   "license": "MIT",

@@ -1,4 +1,13 @@
+import axios from 'axios';
+import axiosRetry from 'axios-retry';
 import Bottleneck from 'bottleneck';
+import { load } from 'cheerio';
+
+axiosRetry(axios, {
+  retries: 3,
+  retryDelay: axiosRetry.exponentialDelay,
+  retryCondition: (error) => error.response?.status === 429 || axiosRetry.isNetworkOrIdempotentRequestError(error),
+});
 
 export type LinkStatus = 'pending' | 'valid' | 'expired' | 'invalid' | 'rate-limited';
 
@@ -7,6 +16,9 @@ export interface LinkValidation {
   status: LinkStatus;
   lastValidated: number; // timestamp
   errorDetails?: string;
+  name?: string; // Group/community name from the invite page
+  iconUrl?: string; // Group icon URL from the invite page
+  cacheVersion?: number; // Bumped whenever this shape changes, to invalidate stale cache entries
 }
 
 export interface StorageData {
@@ -20,69 +32,68 @@ const validationLimiter = new Bottleneck({
 });
 
 const VALIDATION_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_VERSION = 2; // Bump when LinkValidation shape changes so stale cache entries are re-fetched
 
-export const validateLink = async (link: string): Promise<LinkStatus> => {
+export const validateLink = async (link: string): Promise<Omit<LinkValidation, 'link' | 'lastValidated'>> => {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
-    const response = await fetch(link, {
-      method: 'HEAD',
-      mode: 'no-cors',
-      cache: 'no-store',
-      signal: controller.signal,
-    });
-
+    const response = await axios.get(link, { signal: controller.signal });
     clearTimeout(timeoutId);
 
-    // For no-cors requests, we can't check the status directly
-    // But successful fetch with no-cors means the server is reachable
-    if (response.ok || response.type === 'opaque') {
-      return 'valid';
+    const $ = load(response.data);
+    const name = $('#main_block h3').text().trim() || undefined;
+    const iconUrl = $('#main_block img').first().attr('src') || undefined;
+
+    if (name) {
+      return { status: 'valid', name, iconUrl };
     }
 
-    if (response.status === 410 || response.status === 404) {
-      return 'expired';
-    }
-
-    if (response.status === 429) {
-      return 'rate-limited';
-    }
-
-    return 'invalid';
+    // Page loaded but no group name — link is expired or revoked
+    return { status: 'expired' };
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        return 'rate-limited';
+    if (error instanceof Error && (error.name === 'AbortError' || error.name === 'CanceledError')) {
+      return { status: 'rate-limited' };
+    }
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 404 || error.response?.status === 410) {
+        return { status: 'expired' };
       }
-      if (error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
-        return 'expired';
+      if (error.response?.status === 429) {
+        return { status: 'rate-limited' };
       }
     }
-    return 'invalid';
+    return { status: 'invalid' };
   }
 };
 
-export const validateLinkWithStorage = async (link: string): Promise<LinkValidation> => {
-  return validationLimiter.schedule(async () => {
-    // Check cache first
-    const storage = (await chrome.storage.local.get('validations')) as StorageData;
-    const cached = storage.validations?.[link];
+export const validateLinkWithStorage = async (link: string, onStart?: () => void): Promise<LinkValidation> => {
+  // Check cache first, outside the rate limiter — a cache hit needs no network call and
+  // shouldn't wait behind the validationLimiter's queue.
+  const storage = (await chrome.storage.local.get('validations')) as StorageData;
+  const cached = storage.validations?.[link];
 
-    if (cached && Date.now() - cached.lastValidated < VALIDATION_CACHE_DURATION) {
-      return cached;
-    }
+  if (cached && cached.cacheVersion === CACHE_VERSION && Date.now() - cached.lastValidated < VALIDATION_CACHE_DURATION) {
+    return cached;
+  }
+
+  return validationLimiter.schedule(async () => {
+    // Only fires once the rate limiter actually admits this job, not when it's merely queued
+    onStart?.();
 
     // Validate
-    const status = await validateLink(link);
+    const result = await validateLink(link);
     const validation: LinkValidation = {
       link,
-      status,
       lastValidated: Date.now(),
+      cacheVersion: CACHE_VERSION,
+      ...result,
     };
 
-    // Store result
-    const allValidations = storage.validations || {};
+    // Store result — re-read storage here since it may have changed while this job was queued
+    const latestStorage = (await chrome.storage.local.get('validations')) as StorageData;
+    const allValidations = latestStorage.validations || {};
     allValidations[link] = validation;
     await chrome.storage.local.set({ validations: allValidations });
 
@@ -91,7 +102,23 @@ export const validateLinkWithStorage = async (link: string): Promise<LinkValidat
 };
 
 export const validateMultipleLinks = async (links: string[]): Promise<LinkValidation[]> => {
-  const promises = links.map(link => validateLinkWithStorage(link));
+  const promises = links.map((link) => validateLinkWithStorage(link));
+  return Promise.all(promises);
+};
+
+export const validateMultipleLinksWithProgress = async (
+  links: string[],
+  onProgress: (done: number, link: string) => void,
+  onStart?: (link: string) => void
+): Promise<LinkValidation[]> => {
+  let done = 0;
+  const promises = links.map((link) =>
+    validateLinkWithStorage(link, () => onStart?.(link)).then((result) => {
+      done += 1;
+      onProgress(done, link);
+      return result;
+    })
+  );
   return Promise.all(promises);
 };
 
@@ -129,9 +156,25 @@ export const getStatusLabel = (status: LinkStatus): string => {
     case 'invalid':
       return 'Invalid';
     case 'rate-limited':
-      return 'Limited';
+      return 'Rate-limited';
     case 'pending':
     default:
-      return 'Checking...';
+      return 'Pending';
+  }
+};
+
+export const getStatusTooltip = (status: LinkStatus): string => {
+  switch (status) {
+    case 'valid':
+      return 'This link is active and joinable';
+    case 'expired':
+      return 'This link has expired or been revoked';
+    case 'invalid':
+      return 'Could not verify this link (network or parsing error)';
+    case 'rate-limited':
+      return 'Temporarily rate-limited by WhatsApp — will retry automatically';
+    case 'pending':
+    default:
+      return 'Not yet checked';
   }
 };

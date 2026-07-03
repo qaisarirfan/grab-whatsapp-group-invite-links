@@ -1,4 +1,4 @@
-chrome.runtime.onInstalled.addListener(details => {
+chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
     chrome.tabs.create({
       url: 'https://whatsappzilla.blogspot.com/p/installed-grab-whatsapp-groups-links.html',

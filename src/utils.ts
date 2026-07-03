@@ -31,7 +31,7 @@ export const copyToClipboard = async (text: string) => {
 };
 
 // eslint-disable-next-line no-promise-executor-return
-export const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const parseUrl = (val: string) => {
   const parsedUrl = new URL(val);
@@ -47,7 +47,9 @@ export const limiter = new Bottleneck({
   minTime: 200, // Wait 200ms between each request
 });
 
-export const fetchData = async (url: string) => limiter.schedule(() => axios.get(url));
+// A hard timeout is required here: fetchAll() waits on Promise.allSettled() for every
+// scraped page, so one unresponsive site would otherwise hang the entire extraction.
+export const fetchData = async (url: string) => limiter.schedule(() => axios.get(url, { timeout: 10000 }));
 
 export const extractWhatsappLinks = (htmlContent: string) => {
   const waLinks: string[] = [];
@@ -71,13 +73,13 @@ export const convertToCsv = (data: Record<string, unknown>[], filename: string) 
   const parser = new StreamParser(opts, { objectMode: true });
 
   let csv = '';
-  parser.onData = chunk => {
+  parser.onData = (chunk) => {
     csv += chunk.toString();
     return csv;
   };
   parser.onEnd = () => console.log(csv);
-  parser.onError = err => console.error(err);
-  data.forEach(record => parser.write(record));
+  parser.onError = (err) => console.error(err);
+  data.forEach((record) => parser.write(record));
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const fileName = `${filename}-${timestamp}.csv`;

@@ -89,6 +89,10 @@ interface LinkValidation {
   status: LinkStatus;
   lastValidated: number; // Unix ms timestamp
   errorDetails?: string;
+  name?: string; // Group name, scraped from the invite page's #main_block h3
+  memberCount?: number; // Reserved — not currently extracted
+  iconUrl?: string; // Group photo URL, scraped from #main_block img
+  cacheVersion?: number; // Bumped whenever this shape changes, invalidating older cache entries
 }
 
 interface StorageData {
@@ -99,24 +103,28 @@ interface StorageData {
 #### Rate limiter
 
 ```ts
-const validationLimiter = new Bottleneck({ maxConcurrent: 10, minTime: 500 });
+const validationLimiter = new Bottleneck({ maxConcurrent: 5, minTime: 1000 });
 ```
+
+Deliberately conservative (roughly one new request launched per second) since these requests hit WhatsApp's own servers directly. `axios-retry` is configured globally with exponential backoff, retrying on `429` responses and network/idempotent-request errors.
 
 #### Cache duration
 
-24 hours (`24 * 60 * 60 * 1000` ms). Stored in `chrome.storage.local` under the key `"validations"`.
+24 hours (`24 * 60 * 60 * 1000` ms) **and** a matching `CACHE_VERSION` (currently `2`). Stored in `chrome.storage.local` under the key `"validations"`. A cached entry is only reused if both the TTL and the version check pass — bumping `CACHE_VERSION` forces every existing cache entry to be re-fetched the next time it's checked, which is how the `name`/`iconUrl` fields were safely added without stale data lingering for 24 hours.
 
 #### Functions
 
 | Export | Purpose |
 |---|---|
-| `validateLink(link)` | Issues a `HEAD` request with `mode: 'no-cors'` and a 5-second `AbortController` timeout. Returns `'valid'` for opaque or OK responses; `'expired'` for 404/410 or `NetworkError`; `'rate-limited'` for 429 or `AbortError`; `'invalid'` otherwise. |
-| `validateLinkWithStorage(link)` | Wraps `validateLink` in `validationLimiter`. Reads cache first; only fetches if the cached result is older than 24 hours. Writes result back to `chrome.storage.local`. |
-| `validateMultipleLinks(links)` | `Promise.all` over `validateLinkWithStorage` for each link. |
+| `validateLink(link)` | `axios.get()`s the invite page directly (real `host_permissions`, no CORS workaround needed) with an 8-second `AbortController` timeout. Loads the HTML with `cheerio`: if `#main_block h3` has text, the link is `'valid'` (captures `name` and `iconUrl` from `#main_block img`); if the page loads with no name, it's `'expired'`. `404`/`410` → `'expired'`; `429`/timeout → `'rate-limited'`; anything else → `'invalid'`. |
+| `validateLinkWithStorage(link, onStart?)` | Wraps `validateLink` in `validationLimiter`. Reads cache first (TTL + version check); only fetches if stale. Writes the result back to `chrome.storage.local`. The optional `onStart` callback fires the moment the rate limiter actually admits the job — not when it's merely queued — so callers can track which links are currently in flight. |
+| `validateMultipleLinks(links)` | `Promise.all` over `validateLinkWithStorage` for each link, no progress reporting. |
+| `validateMultipleLinksWithProgress(links, onProgress, onStart?)` | Same as above, but calls `onProgress(doneCount, link)` after each link settles and `onStart(link)` when each link's validation actually begins — powers the live progress bar and "currently validating" indicator in the popup. |
 | `getValidationStatus(link)` | Reads `chrome.storage.local` and returns the cached `LinkValidation` or `null`. |
 | `clearValidationCache()` | Removes the `"validations"` key from `chrome.storage.local`. |
 | `getStatusColor(status)` | Returns a hex colour string for UI display. |
-| `getStatusLabel(status)` | Returns a human-readable label (`Active`, `Expired`, `Invalid`, `Limited`, `Checking...`). |
+| `getStatusLabel(status)` | Returns a human-readable label (`Active`, `Expired`, `Invalid`, `Rate-limited`, `Pending`). |
+| `getStatusTooltip(status)` | Returns a one-sentence explanation of what the status means, used as a `title` attribute on badges and filter chips. |
 
 ---
 

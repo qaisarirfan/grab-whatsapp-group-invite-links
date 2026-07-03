@@ -55,7 +55,7 @@ function getDirectoryListing(dirPath, urlPath) {
     html += `<li><a href="${parentPath === '/' ? '/' : parentPath}">..</a> (parent directory)</li>`;
   }
 
-  files.forEach(file => {
+  files.forEach((file) => {
     const filePath = path.join(dirPath, file);
     const stat = fs.statSync(filePath);
     const href = path.join(urlPath || '/', file);
