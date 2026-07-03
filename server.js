@@ -14,7 +14,7 @@ const mimeTypes = {
   '.jpg': 'image/jpeg',
   '.gif': 'image/gif',
   '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon'
+  '.ico': 'image/x-icon',
 };
 
 function getDirectoryListing(dirPath, urlPath) {
@@ -70,12 +70,12 @@ function getDirectoryListing(dirPath, urlPath) {
 
 const server = http.createServer((req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  
+
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
   if (urlPath === '/') urlPath = '';
-  
+
   const filePath = path.join(DIST_DIR, urlPath);
-  
+
   if (!fs.existsSync(filePath)) {
     res.writeHead(404, { 'Content-Type': 'text/html' });
     res.end('<h1>404 - File Not Found</h1><p><a href="/">Go back to file listing</a></p>');
@@ -83,7 +83,7 @@ const server = http.createServer((req, res) => {
   }
 
   const stat = fs.statSync(filePath);
-  
+
   if (stat.isDirectory()) {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(getDirectoryListing(filePath, urlPath || '/'));
@@ -92,7 +92,7 @@ const server = http.createServer((req, res) => {
 
   const ext = path.extname(filePath).toLowerCase();
   const contentType = mimeTypes[ext] || 'application/octet-stream';
-  
+
   res.writeHead(200, { 'Content-Type': contentType });
   fs.createReadStream(filePath).pipe(res);
 });

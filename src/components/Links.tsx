@@ -71,10 +71,10 @@ function Links({ links, isLoading, fetchAll, isGoogleSearch, onValidateAll, isVa
 
   return (
     <>
-      <Actions 
-        isGoogleSearchPage={isGoogleSearch} 
-        isLoading={isLoading} 
-        links={links} 
+      <Actions
+        isGoogleSearchPage={isGoogleSearch}
+        isLoading={isLoading}
+        links={links}
         onFetch={fetchAll}
         onValidateAll={onValidateAll}
         isValidating={isValidating}
@@ -106,9 +106,7 @@ function Links({ links, isLoading, fetchAll, isGoogleSearch, onValidateAll, isVa
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     {hasValidation && (
                       <>
-                        <StatusBadge color={color}>
-                          {label}
-                        </StatusBadge>
+                        <StatusBadge color={color}>{label}</StatusBadge>
                         {timestamp && <TimestampText>Last checked: {timestamp}</TimestampText>}
                       </>
                     )}

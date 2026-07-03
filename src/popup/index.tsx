@@ -247,12 +247,28 @@ function Popup() {
               setCurrentTab(tab);
             }}
           />
-          {currentTab === 'links' && <Links links={links} fetchAll={fetchAll} isLoading={isLoading} isGoogleSearch={isGoogleSearchPage} onValidateAll={validateAllLinks} isValidating={isValidating} />}
+          {currentTab === 'links' && (
+            <Links
+              links={links}
+              fetchAll={fetchAll}
+              isLoading={isLoading}
+              isGoogleSearch={isGoogleSearchPage}
+              onValidateAll={validateAllLinks}
+              isValidating={isValidating}
+            />
+          )}
           {currentTab === 'logs' && <Logs logs={logs.reverse()} isLoading={isLoading} progress={`${logs.length}/${searchLinks.length}`} />}
         </>
       )}
       {!isGoogleSearchPage && links.length > 0 && (
-        <Links links={links} fetchAll={fetchAll} isLoading={isLoading} isGoogleSearch={isGoogleSearchPage} onValidateAll={validateAllLinks} isValidating={isValidating} />
+        <Links
+          links={links}
+          fetchAll={fetchAll}
+          isLoading={isLoading}
+          isGoogleSearch={isGoogleSearchPage}
+          onValidateAll={validateAllLinks}
+          isValidating={isValidating}
+        />
       )}
       {!isGoogleSearchPage && links.length < 1 && (
         <>
