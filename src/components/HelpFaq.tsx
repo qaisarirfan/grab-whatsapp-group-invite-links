@@ -1,90 +1,11 @@
 import { useState } from 'react';
 
-import { styled } from 'styled-components';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
 
 import Analytics from '@src/analytics';
 import type { LinkStatus } from '@src/validation';
 import { getStatusColor, getStatusLabel, getStatusTooltip } from '@src/validation';
-
-const Container = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  max-height: calc(100vh - 140px);
-  overflow-y: auto;
-  padding: 12px 4px;
-`;
-
-const Section = styled.section`
-  h3 {
-    margin: 0 0 8px;
-  }
-
-  ul {
-    margin: 0;
-    padding-left: 20px;
-  }
-
-  li {
-    margin-bottom: 6px;
-  }
-`;
-
-const BadgeLegend = styled.ul`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-`;
-
-const BadgeRow = styled.li`
-  align-items: flex-start;
-  display: flex;
-  gap: 8px;
-`;
-
-const BadgeDot = styled.span<{ $color: string }>`
-  background-color: ${({ $color }) => $color};
-  border-radius: 50%;
-  flex-shrink: 0;
-  height: 10px;
-  margin-top: 5px;
-  width: 10px;
-`;
-
-const FaqList = styled.div`
-  display: flex;
-  flex-direction: column;
-`;
-
-const FaqItem = styled.div`
-  border-bottom: 1px solid #e0e0e0;
-
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-const FaqQuestion = styled.button`
-  align-items: center;
-  background: none;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  font-size: 14px;
-  font-weight: 600;
-  gap: 8px;
-  padding: 10px 0;
-  text-align: left;
-  width: 100%;
-`;
-
-const FaqAnswer = styled.p`
-  color: #555;
-  margin: 0 0 12px;
-`;
 
 const BADGE_STATUSES: LinkStatus[] = ['valid', 'expired', 'invalid', 'rate-limited'];
 
@@ -132,6 +53,11 @@ const FAQS: { question: string; answer: string }[] = [
     answer: 'Yes. It opens automatically on install and update to show more information about the extension. You can close it anytime.',
   },
   {
+    question: 'What is the difference between the popup and the side panel?',
+    answer:
+      'They are the same extension with the same tabs, buttons, and badges. The popup closes as soon as you click elsewhere; the side panel stays open next to the page until you close it.',
+  },
+  {
     question: 'Does this extension track what websites I visit?',
     answer:
       'It sends the address and title of the page you have open to Google Analytics each time you open the popup, plus anonymous click/usage counts. It never reads passwords or anything you type, and the links you find are never sent anywhere except your clipboard or a downloaded file.',
@@ -141,17 +67,17 @@ const FAQS: { question: string; answer: string }[] = [
 function HelpFaq() {
   const [openQuestion, setOpenQuestion] = useState<string | null>(null);
 
-  const toggleQuestion = (question: string) => {
-    const opened = openQuestion !== question;
-    Analytics.fireEvent('faq_item_toggled', { question, opened });
-    setOpenQuestion(opened ? question : null);
+  const handleValueChange = (value: string[]) => {
+    const opened = value[0] ?? null;
+    Analytics.fireEvent('faq_item_toggled', { question: opened ?? openQuestion, opened: !!opened });
+    setOpenQuestion(opened);
   };
 
   return (
-    <Container>
-      <Section>
-        <h3>How to use</h3>
-        <ul>
+    <div className="flex max-h-[calc(100vh-140px)] flex-col gap-5 overflow-y-auto px-1 py-3">
+      <section>
+        <h3 className="mb-2 text-sm font-semibold">How to use</h3>
+        <ul className="list-disc space-y-1.5 pl-5 text-sm">
           <li>
             <strong>Regular webpage:</strong> open the popup and any WhatsApp group invite links already on the page show up immediately.
           </li>
@@ -162,41 +88,39 @@ function HelpFaq() {
           <li>
             <strong>Validate links:</strong> click Validate links to check whether each found link is still active.
           </li>
+          <li>
+            <strong>Side panel:</strong> click Open in side panel (next to the tabs) or right-click the toolbar icon or the page to keep the
+            extension open next to the page instead of it closing automatically.
+          </li>
         </ul>
-      </Section>
+      </section>
 
-      <Section>
-        <h3>Link status badges</h3>
-        <BadgeLegend>
+      <section>
+        <h3 className="mb-2 text-sm font-semibold">Link status badges</h3>
+        <ul className="flex flex-col gap-2">
           {BADGE_STATUSES.map((status) => (
-            <BadgeRow key={status}>
-              <BadgeDot $color={getStatusColor(status)} />
-              <span>
-                <strong>{getStatusLabel(status)}</strong> &mdash; {getStatusTooltip(status)}
-              </span>
-            </BadgeRow>
+            <li key={status} className="flex items-start gap-2">
+              <Badge style={{ backgroundColor: getStatusColor(status), color: '#fff' }} className="mt-0.5 border-transparent">
+                {getStatusLabel(status)}
+              </Badge>
+              <span className="text-sm text-muted-foreground">{getStatusTooltip(status)}</span>
+            </li>
           ))}
-        </BadgeLegend>
-      </Section>
+        </ul>
+      </section>
 
-      <Section>
-        <h3>Frequently asked questions</h3>
-        <FaqList>
-          {FAQS.map(({ question, answer }) => {
-            const isOpen = openQuestion === question;
-            return (
-              <FaqItem key={question}>
-                <FaqQuestion type="button" onClick={() => toggleQuestion(question)} aria-expanded={isOpen}>
-                  <span>{isOpen ? '−' : '+'}</span>
-                  <span>{question}</span>
-                </FaqQuestion>
-                {isOpen && <FaqAnswer>{answer}</FaqAnswer>}
-              </FaqItem>
-            );
-          })}
-        </FaqList>
-      </Section>
-    </Container>
+      <section>
+        <h3 className="mb-2 text-sm font-semibold">Frequently asked questions</h3>
+        <Accordion value={openQuestion ? [openQuestion] : []} onValueChange={handleValueChange}>
+          {FAQS.map(({ question, answer }) => (
+            <AccordionItem key={question} value={question}>
+              <AccordionTrigger>{question}</AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">{answer}</AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </section>
+    </div>
   );
 }
 

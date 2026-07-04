@@ -15,13 +15,16 @@ Version: `5.0.0`
 | Source | Output | Runtime context |
 |---|---|---|
 | `src/background.ts` | `dist/js/background.js` | Service worker |
-| `src/popup/index.tsx` | `dist/popup.html` + `dist/js/popup.js` | Extension popup (browser action) |
+| `src/popup/index.tsx` | `dist/popup.html` + `dist/js/popup.js` | Extension popup (browser action, opened by left-clicking the toolbar icon) |
+| `src/sidepanel/index.tsx` | `dist/sidepanel.html` + `dist/js/sidepanel.js` | Side panel (opened via the "Open in side panel" button or the right-click context menu) |
+
+Both `src/popup/index.tsx` and `src/sidepanel/index.tsx` are thin mount wrappers — each just calls `createRoot` and renders `<App context="popup" />` or `<App context="sidepanel" />`. All state, orchestration, and rendering lives in the shared `src/components/App.tsx`, so the two surfaces stay behaviorally identical except for the one context-specific button described below.
 
 ### Build system
 
 Webpack 5 with two configs:
 
-- `webpack/webpack.common.js` — shared config; defines both entry points, chunk splitting (`react` chunk, `vendors` chunk), and `TsconfigPathsPlugin` for path aliases.
+- `webpack/webpack.common.js` — shared config; defines all three entry points, chunk splitting (`react` chunk, `vendors` chunk), and `TsconfigPathsPlugin` for path aliases.
 - `webpack/webpack.prod.js` — extends common; adds `ZipWebpackPlugin` to produce a distributable `.zip` alongside `dist/`.
 - `webpack/webpack.dev.js` — extends common; enables watch mode.
 
@@ -38,9 +41,10 @@ Webpack 5 with two configs:
 
 ### `src/background.ts`
 
-Service worker. Stateless — no business logic.
+Service worker. Stateless — no business logic beyond lifecycle and side-panel wiring.
 
-- `chrome.runtime.onInstalled` (reason: `install` or `update`) → opens an onboarding tab.
+- `chrome.runtime.onInstalled` (reason: `install` or `update`) → opens an onboarding tab, and registers a `contextMenus` item (`open-side-panel`, contexts: `action` and `page`).
+- `chrome.contextMenus.onClicked` → if the clicked item is `open-side-panel`, calls `chrome.sidePanel.open({ windowId })` for the current window.
 - `chrome.runtime.setUninstallURL` → sets a feedback URL shown on uninstall.
 
 ---
@@ -162,7 +166,12 @@ Events fired across the app:
 
 ---
 
-## Popup application (`src/popup/index.tsx`)
+## App component (`src/components/App.tsx`)
+
+Shared root component rendered by both `src/popup/index.tsx` (`context="popup"`) and `src/sidepanel/index.tsx` (`context="sidepanel"`). All extraction/validation state and orchestration live here; the two entry points differ only in:
+
+- `Container`'s `$isSidePanel` styling (the popup keeps a fixed 650px min/max width; the side panel is fluid so it can be resized by the user).
+- An "Open in side panel" button rendered next to the tab bar only when `context === 'popup'`. Clicking it calls `chrome.tabs.query({ active: true, currentWindow: true })` to get the current window, then `chrome.sidePanel.open({ windowId })`, then closes the popup window. This is the in-UI equivalent of the background script's context menu item.
 
 ### State
 
@@ -248,6 +257,8 @@ Generic tab selector. Renders tab buttons and calls `onTabSelected` with the cho
 | `activeTab` | Read the URL and title of the currently focused tab |
 | `scripting` | Inject `getAllAnchorTags` into the active tab's DOM |
 | `storage` | Persist `clientId`, `sessionData`, and validation cache |
+| `sidePanel` | Register `side_panel.default_path` and call `chrome.sidePanel.open()` |
+| `contextMenus` | Register the "Open in side panel" right-click item on the toolbar icon and on the page |
 | `https://*/*`, `http://*/*` | Fetch arbitrary URLs in Google Search mode |
 
 ---

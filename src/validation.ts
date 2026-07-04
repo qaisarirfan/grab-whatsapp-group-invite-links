@@ -74,7 +74,14 @@ export const validateLinkWithStorage = async (link: string, onStart?: () => void
   const storage = (await chrome.storage.local.get('validations')) as StorageData;
   const cached = storage.validations?.[link];
 
-  if (cached && cached.cacheVersion === CACHE_VERSION && Date.now() - cached.lastValidated < VALIDATION_CACHE_DURATION) {
+  // Rate-limited results are never served from cache — getStatusTooltip() promises they'll
+  // retry automatically, so every validation pass must give them a fresh attempt.
+  if (
+    cached &&
+    cached.cacheVersion === CACHE_VERSION &&
+    cached.status !== 'rate-limited' &&
+    Date.now() - cached.lastValidated < VALIDATION_CACHE_DURATION
+  ) {
     return cached;
   }
 

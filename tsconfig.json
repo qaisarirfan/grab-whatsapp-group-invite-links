@@ -1,19 +1,21 @@
 {
   "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
+    "noEmit": true,
+    "isolatedModules": true,
     "module": "nodenext",
     "target": "ES6",
     "moduleResolution": "nodenext",
     "esModuleInterop": true,
+    "skipLibCheck": true,
     "strict": true,
     "sourceMap": true,
     "jsx": "react-jsx",
     "paths": {
+      "@/*": ["./src/*"],
       "@components/*": ["./src/components/*"],
       "@src/*": ["./src/*"]
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "src/components/ui", "src/hooks/use-mobile.ts", "src/lib/utils.ts"]
 }

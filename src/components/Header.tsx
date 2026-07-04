@@ -1,55 +1,17 @@
-import { styled } from 'styled-components';
-
-const StyledHeader = styled.header`
-  align-items: center;
-  border-left: unset;
-  border-right: unset;
-  border-top: unset;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-around;
-  padding: 8px;
-
-  .logo {
-    display: flex;
-    align-items: center;
-    flex-direction: column;
-
-    img {
-      height: auto;
-      width: 70px;
-    }
-
-    p {
-      font-size: 18px;
-    }
-  }
-  .buymeacoffee {
-    align-items: center;
-    display: flex;
-    gap: 12px;
-    padding: 18px 0;
-
-    img {
-      height: 30px;
-    }
-  }
-`;
-
 function Header() {
   return (
-    <StyledHeader>
-      <div className="logo">
-        <img src="./images/logo.png" alt="logo" />
-        <p>Grab whatsapp group invite links</p>
+    <header className="flex flex-col items-center justify-around p-2">
+      <div className="flex flex-col items-center">
+        <img src="./images/logo.png" alt="logo" className="h-auto w-17.5" />
+        <p className="text-lg">Grab whatsapp group invite links</p>
       </div>
-      <div className="buymeacoffee">
+      <div className="flex items-center gap-3 py-4.5">
         <p>Support me on</p>
         <a href="https://www.buymeacoffee.com/qaisarirfan" target="_blank" rel="noreferrer">
-          <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" />
+          <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" className="h-7.5" />
         </a>
       </div>
-    </StyledHeader>
+    </header>
   );
 }
 

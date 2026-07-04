@@ -1,85 +1,38 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
+import type { TableComponents } from 'react-virtuoso';
+import { TableVirtuoso } from 'react-virtuoso';
 
-import { styled } from 'styled-components';
+import { Avatar, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 import type { LinkStatus, LinkValidation, StorageData } from '@src/validation';
 import { getStatusColor, getStatusLabel, getStatusTooltip } from '@src/validation';
 
 import Actions from './Actions';
 
-const Loader = styled.div`
-  border-radius: 50%;
-  height: 20px;
-  position: relative;
-  width: 20px;
-`;
-
-const StatusBadge = styled.span<{ color: string }>`
-  background-color: ${(props) => props.color};
-  color: white;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-`;
-
-const TimestampText = styled.div`
-  font-size: 11px;
-  color: #666;
-  margin-top: 2px;
-`;
-
-const GroupName = styled.div`
-  font-weight: 600;
-  margin-bottom: 2px;
-`;
-
-const GroupIcon = styled.img`
-  border-radius: 50%;
-  height: 32px;
-  object-fit: cover;
-  width: 32px;
-`;
-
-const StickyToolbar = styled.div`
-  background: #fff;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-`;
-
-const FilterBar = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding-bottom: 12px;
-`;
-
-const FilterButton = styled.button<{ $active: boolean; $color: string; $muted: boolean }>`
-  background: ${(props) => (props.$active ? props.$color : `color-mix(in srgb, ${props.$color} 14%, white)`)};
-  color: ${(props) => (props.$active ? '#fff' : props.$color)};
-  opacity: ${(props) => (props.$muted ? 0.5 : 1)};
-`;
-
 const NEUTRAL_FILTER_COLOR = '#333';
-const STRIPE_COLOR = '#e2e6e9'; // matches fictoan's .striped tbody tr:nth-child(even)
 
 type StatusFilter = 'all' | LinkStatus;
 
 const getFilterColor = (key: StatusFilter): string => (key === 'all' ? NEUTRAL_FILTER_COLOR : getStatusColor(key));
 
-// Fixed row height enables windowing: only rows in view (plus overscan) are ever mounted,
-// so extraction results in the thousands don't bloat the DOM or slow down scrolling.
-const ROW_HEIGHT = 76;
-const OVERSCAN = 6;
+// Row height used for cell sizing; TableVirtuoso itself windows the rows so extraction
+// results in the thousands don't bloat the DOM or slow down scrolling.
 const VIEWPORT_HEIGHT = 420;
 
-const TableScrollContainer = styled.div`
-  max-height: ${VIEWPORT_HEIGHT}px;
-  overflow-y: auto;
-`;
+const tableComponents: TableComponents<string> = {
+  Table: (props) => <table {...props} />,
+  TableHead: (props) => <TableHeader {...props} />,
+  TableBody,
+  TableRow: (props) => (
+    <TableRow data-index={props['data-index']} data-item-index={props['data-item-index']} data-known-size={props['data-known-size']}>
+      {props.children}
+    </TableRow>
+  ),
+};
 
 interface PropTypes {
   fetchAll: VoidFunction;
@@ -109,7 +62,6 @@ function Links({
   const [validations, setValidations] = useState<Record<string, LinkValidation>>({});
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [hideDuplicates, setHideDuplicates] = useState(false);
-  const [scrollTop, setScrollTop] = useState(0);
 
   useEffect(() => {
     const loadValidations = async () => {
@@ -155,39 +107,19 @@ function Links({
       )
     : filteredLinks;
 
-  const { startIndex, windowedLinks, topSpacerHeight, bottomSpacerHeight } = useMemo(() => {
-    const visibleRowCount = Math.ceil(VIEWPORT_HEIGHT / ROW_HEIGHT) + OVERSCAN * 2;
-    const start = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
-    const end = Math.min(displayedLinks.length, start + visibleRowCount);
-    return {
-      startIndex: start,
-      windowedLinks: displayedLinks.slice(start, end),
-      topSpacerHeight: start * ROW_HEIGHT,
-      bottomSpacerHeight: (displayedLinks.length - end) * ROW_HEIGHT,
-    };
-  }, [displayedLinks, scrollTop]);
-
   const filterKeys: StatusFilter[] = ['all', 'valid', 'expired', 'invalid', 'rate-limited', 'pending'];
 
   if (isLoading) {
     return (
-      <div
-        style={{
-          alignItems: 'center',
-          display: 'flex',
-          height: '100vh',
-          justifyContent: 'center',
-          width: '100vw',
-        }}
-      >
-        <Loader className="with-loader bg-grey" />
+      <div className="flex h-screen w-screen items-center justify-center">
+        <Spinner className="size-6 text-muted-foreground" />
       </div>
     );
   }
 
   return (
     <>
-      <StickyToolbar>
+      <div className="sticky top-0 z-10 bg-background">
         <Actions
           isGoogleSearchPage={isGoogleSearch}
           isLoading={isLoading}
@@ -203,95 +135,104 @@ function Links({
           onToggleAutoValidate={onToggleAutoValidate}
         />
         {links.length > 0 && (
-          <FilterBar>
-            {filterKeys.map((key) => (
-              <FilterButton
-                key={key}
-                type="button"
-                className="size-small shadow-hard"
-                title={key === 'all' ? 'Show every extracted link' : getStatusTooltip(key)}
-                $active={statusFilter === key}
-                $color={getFilterColor(key)}
-                $muted={key !== 'all' && key !== statusFilter && statusCounts[key] === 0}
-                onClick={() => setStatusFilter(key)}
-              >
-                {`${key === 'all' ? 'All' : getStatusLabel(key)} (${statusCounts[key]})`}
-              </FilterButton>
-            ))}
-            <FilterButton
+          <div className="flex flex-wrap items-center gap-2 pb-3">
+            <span className="mr-0.5 text-[11px] tracking-wide text-muted-foreground uppercase">Filter:</span>
+            {filterKeys
+              .filter((key) => key === 'all' || key === statusFilter || statusCounts[key] > 0)
+              .map((key) => (
+                <Button
+                  key={key}
+                  type="button"
+                  size="xs"
+                  variant="secondary"
+                  title={key === 'all' ? 'Show every extracted link' : getStatusTooltip(key)}
+                  style={{
+                    backgroundColor: statusFilter === key ? getFilterColor(key) : `color-mix(in srgb, ${getFilterColor(key)} 14%, white)`,
+                    color: statusFilter === key ? '#fff' : getFilterColor(key),
+                  }}
+                  onClick={() => setStatusFilter(key)}
+                >
+                  {`${key === 'all' ? 'All' : getStatusLabel(key)} (${statusCounts[key]})`}
+                </Button>
+              ))}
+            <Button
               type="button"
-              className="size-small shadow-hard"
+              size="xs"
+              variant="secondary"
               title="Collapse invite links that resolve to the same group name"
-              $active={hideDuplicates}
-              $color={NEUTRAL_FILTER_COLOR}
-              $muted={false}
+              style={{
+                backgroundColor: hideDuplicates ? NEUTRAL_FILTER_COLOR : `color-mix(in srgb, ${NEUTRAL_FILTER_COLOR} 14%, white)`,
+                color: hideDuplicates ? '#fff' : NEUTRAL_FILTER_COLOR,
+              }}
               onClick={() => setHideDuplicates((v) => !v)}
             >
               Hide duplicates
-            </FilterButton>
-          </FilterBar>
+            </Button>
+          </div>
         )}
-      </StickyToolbar>
-      <TableScrollContainer onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}>
-        <table className="ff-table bordered-rows full-width padding-tiny">
-          <tbody>
-            {topSpacerHeight > 0 && (
-              <tr>
-                <td colSpan={2} style={{ height: topSpacerHeight, padding: 0, border: 'none' }} />
-              </tr>
-            )}
-            {windowedLinks.map((link, i) => {
-              const absoluteIndex = startIndex + i;
-              const validation = validations[link];
-              const hasValidation = !!validation;
-              const status = validation?.status || 'pending';
-              const color = getStatusColor(status);
-              const label = getStatusLabel(status);
-              const timestamp = validation?.lastValidated ? new Date(validation.lastValidated).toLocaleDateString() : '';
-              const rowBackground = absoluteIndex % 2 === 1 ? STRIPE_COLOR : undefined;
+      </div>
+      <TableVirtuoso
+        style={{ height: VIEWPORT_HEIGHT }}
+        data={displayedLinks}
+        components={tableComponents}
+        computeItemKey={(_index, link) => link}
+        fixedHeaderContent={() => (
+          <TableRow>
+            <TableHead className="w-12">#</TableHead>
+            <TableHead>Group</TableHead>
+          </TableRow>
+        )}
+        itemContent={(index, link) => {
+          const validation = validations[link];
+          const hasValidation = !!validation;
+          const status = validation?.status || 'pending';
+          const color = getStatusColor(status);
+          const label = getStatusLabel(status);
+          const timestamp = validation?.lastValidated ? new Date(validation.lastValidated).toLocaleDateString() : '';
 
-              return (
-                <tr key={link} style={{ backgroundColor: rowBackground }}>
-                  <td style={{ height: ROW_HEIGHT }}>
-                    {(absoluteIndex + 1).toLocaleString(undefined, {
-                      useGrouping: false,
-                      minimumIntegerDigits: 3,
-                    })}
-                  </td>
-                  <td style={{ height: ROW_HEIGHT, overflow: 'hidden' }}>
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', height: '100%' }}>
-                      {validation?.iconUrl && <GroupIcon src={validation.iconUrl} alt="" />}
-                      <div>
-                        {validation?.name && <GroupName>{validation.name}</GroupName>}
-                        <div style={{ marginBottom: '4px' }}>
-                          <a className="font-mono text-small" target="_blank" href={link} rel="noreferrer">
-                            {link}
-                          </a>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          {hasValidation && (
-                            <>
-                              <StatusBadge color={color} title={getStatusTooltip(status)}>
-                                {label}
-                              </StatusBadge>
-                              {timestamp && <TimestampText>Last checked: {timestamp}</TimestampText>}
-                            </>
-                          )}
-                        </div>
-                      </div>
+          return (
+            <>
+              <TableCell>
+                {(index + 1).toLocaleString(undefined, {
+                  useGrouping: false,
+                  minimumIntegerDigits: 3,
+                })}
+              </TableCell>
+              <TableCell>
+                <div className="flex h-full items-start gap-2">
+                  {validation?.iconUrl && (
+                    <Avatar>
+                      <AvatarImage src={validation.iconUrl} alt="" />
+                    </Avatar>
+                  )}
+                  <div>
+                    {validation?.name && <div className="mb-0.5 font-semibold">{validation.name}</div>}
+                    <div className="mb-1">
+                      <a className="font-mono text-xs break-all" target="_blank" href={link} rel="noreferrer">
+                        {link}
+                      </a>
                     </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {bottomSpacerHeight > 0 && (
-              <tr>
-                <td colSpan={2} style={{ height: bottomSpacerHeight, padding: 0, border: 'none' }} />
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </TableScrollContainer>
+                    <div className="flex items-center gap-2">
+                      {hasValidation && (
+                        <>
+                          <Badge
+                            style={{ backgroundColor: color, color: '#fff' }}
+                            title={getStatusTooltip(status)}
+                            className="border-transparent"
+                          >
+                            {label}
+                          </Badge>
+                          {timestamp && <div className="text-[11px] text-muted-foreground">Last checked: {timestamp}</div>}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </TableCell>
+            </>
+          );
+        }}
+      />
     </>
   );
 }

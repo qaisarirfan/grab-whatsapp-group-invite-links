@@ -1,86 +1,34 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { styled } from 'styled-components';
+// Deep imports (instead of `from 'lucide-react'`) avoid pulling the whole icon set into the
+// bundle — lucide-react's barrel file isn't tree-shaken by this webpack config and previously
+// added ~1.5MB to vendors.js for 3 icons.
+import ChevronDownIcon from 'lucide-react/dist/esm/icons/chevron-down.mjs';
+import ChevronUpIcon from 'lucide-react/dist/esm/icons/chevron-up.mjs';
+import Loader2Icon from 'lucide-react/dist/esm/icons/loader-2.mjs';
+
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
 
 import Analytics from '@src/analytics';
 import { convertToCsv, copyToClipboard } from '@src/utils';
 import type { LinkValidation } from '@src/validation';
 import { getStatusLabel } from '@src/validation';
 
-const ActionsContainer = styled.div`
-  align-items: center;
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px;
-  padding-bottom: 12px;
-  padding-top: 12px;
-`;
-
-const ScopeGroup = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-left: 12px;
-  border-left: 2px solid #ddd;
-`;
-
-const ScopeCaption = styled.span`
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #888;
-`;
-
-const Toggle = styled.label`
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  font-size: 12px;
-  cursor: pointer;
-`;
-
-const ProgressSection = styled.div`
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 4px 0 8px;
-`;
-
-const ProgressTrack = styled.div`
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: #eee;
-  overflow: hidden;
-`;
-
-const ProgressFill = styled.div<{ $percent: number }>`
-  height: 100%;
-  width: ${(props) => props.$percent}%;
-  background: #f68a46;
-  transition: width 0.3s ease;
-`;
-
-const ProgressMeta = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  color: #666;
-`;
-
-const CurrentlyValidating = styled.span`
-  font-family: monospace;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-  min-width: 0;
-`;
+type ExportScope = 'shown' | 'valid';
 
 interface PropTypes {
   isGoogleSearchPage: boolean;
@@ -111,18 +59,26 @@ function Actions({
   autoValidate,
   onToggleAutoValidate,
 }: PropTypes) {
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [exportScope, setExportScope] = useState<ExportScope>('shown');
   const [hasCopyAsJSON, setHasCopyAsJSON] = useState(false);
   const [isCopyAsJSON, setIsCopyAsJSON] = useState(false);
   const [hasCopyAsText, setHasCopyAsText] = useState(false);
   const [isCopyAsText, setIsCopyAsText] = useState(false);
-  const [hasCopyValid, setHasCopyValid] = useState(false);
-  const [isCopyValid, setIsCopyValid] = useState(false);
 
   // "Copy/Download" actions operate on whatever the status filter + dedupe toggle currently show,
   // not the full extracted set — so exports always match what's on screen.
   const isScoped = visibleLinks.length !== links.length;
-  const scopeWord = isScoped ? `shown (${visibleLinks.length})` : 'all';
   const validLinks = visibleLinks.filter((link) => validations?.[link]?.status === 'valid');
+  const activeLinks = exportScope === 'valid' ? validLinks : visibleLinks;
+
+  // Valid-only scope disappears if the underlying data changes (e.g. re-validating) — fall back to "shown".
+  useEffect(() => {
+    if (exportScope === 'valid' && validLinks.length === 0) {
+      setExportScope('shown');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [validLinks.length]);
 
   const onFetchHandler = () => {
     setHasCopyAsJSON(false);
@@ -138,7 +94,8 @@ function Actions({
   };
 
   const handleCopy = async (format: string) => {
-    Analytics.fireEvent(`${format}_link_copied`, { total: visibleLinks.length });
+    const eventPrefix = exportScope === 'valid' ? 'valid_links' : `${format}_link`;
+    Analytics.fireEvent(`${eventPrefix}_copied`, { total: activeLinks.length });
     const isTextFormat = format === 'text';
 
     setHasCopyAsJSON(false);
@@ -151,7 +108,7 @@ function Actions({
     }
 
     try {
-      const content = isTextFormat ? visibleLinks.join('\r\n') : JSON.stringify(visibleLinks);
+      const content = isTextFormat ? activeLinks.join('\r\n') : JSON.stringify(activeLinks);
       await copyToClipboard(content);
 
       if (isTextFormat) {
@@ -172,49 +129,6 @@ function Actions({
     }
   };
 
-  const handleCopyValid = async () => {
-    Analytics.fireEvent('valid_links_copied', { total: validLinks.length });
-    setHasCopyValid(false);
-    setIsCopyValid(true);
-
-    try {
-      await copyToClipboard(validLinks.join('\r\n'));
-      setIsCopyValid(false);
-      setHasCopyValid(true);
-    } catch {
-      setIsCopyValid(false);
-      setHasCopyValid(false);
-    }
-  };
-
-  const buttonClasses = ['size-small', 'shadow-hard', 'bg-blue', 'text-white', 'with-loader'];
-  let copyAsTextButton = [...buttonClasses];
-  if (!isCopyAsText) {
-    copyAsTextButton = copyAsTextButton.filter((val) => val !== 'with-loader');
-  }
-  if (hasCopyAsText) {
-    copyAsTextButton = copyAsTextButton.filter((val) => val !== 'bg-blue');
-    copyAsTextButton.push('bg-green');
-  }
-
-  let copyAsJSONButton = [...buttonClasses];
-  if (!isCopyAsJSON) {
-    copyAsJSONButton = copyAsJSONButton.filter((val) => val !== 'with-loader');
-  }
-  if (hasCopyAsJSON) {
-    copyAsJSONButton = copyAsJSONButton.filter((val) => val !== 'bg-blue');
-    copyAsJSONButton.push('bg-green');
-  }
-
-  let copyValidButton = [...buttonClasses];
-  if (!isCopyValid) {
-    copyValidButton = copyValidButton.filter((val) => val !== 'with-loader');
-  }
-  if (hasCopyValid) {
-    copyValidButton = copyValidButton.filter((val) => val !== 'bg-blue');
-    copyValidButton.push('bg-green');
-  }
-
   const hasAnyValidation = !!validations && Object.keys(validations).length > 0;
 
   const toCsvRow = (link: string) => {
@@ -225,6 +139,13 @@ function Actions({
       LastValidated: validation?.lastValidated ? new Date(validation.lastValidated).toLocaleDateString() : '',
       URL: link,
     };
+  };
+
+  const handleDownload = () => {
+    const eventName = exportScope === 'valid' ? 'valid_links_downloaded' : 'links_downloaded';
+    const fileName = exportScope === 'valid' ? 'valid-links' : 'links';
+    Analytics.fireEvent(eventName, { total: activeLinks.length });
+    convertToCsv(activeLinks.map(toCsvRow), fileName);
   };
 
   const progressDone = validationProgress?.done ?? 0;
@@ -238,99 +159,110 @@ function Actions({
   const progressPercent = progressTotal > 0 ? Math.min(100, Math.round((progressDone / progressTotal) * 100)) : 0;
 
   return (
-    <ActionsContainer>
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-        {links.length > 0 && <p>{isScoped ? `Showing ${visibleLinks.length} of ${links.length}` : `Total: ${links.length}`}</p>}
+    <div className="flex flex-row flex-wrap items-center justify-between gap-2 py-3">
+      <div className="flex items-center gap-3">
+        {links.length > 0 && (
+          <p className="text-sm text-muted-foreground">
+            {isScoped ? `Showing ${visibleLinks.length} of ${links.length}` : `Total: ${links.length}`}
+          </p>
+        )}
       </div>
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div className="flex flex-wrap items-center gap-2">
         {isGoogleSearchPage && links.length > 0 && (
-          <button
-            className={`size-small bg-yellow shadow-hard ${isLoading && 'with-loader'}`}
+          <Button
             type="button"
+            size="sm"
+            variant="secondary"
             onClick={onFetchHandler}
             disabled={isLoading}
+            title="Re-scan this page's search results for WhatsApp invite links"
           >
+            {isLoading && <Loader2Icon className="animate-spin" />}
             Extract again
-          </button>
+          </Button>
         )}
         {links.length > 0 && (
-          <button
-            className={`size-small bg-orange shadow-hard ${isValidating && 'with-loader'}`}
+          <Button
             type="button"
+            size="sm"
             onClick={onValidateHandler}
             disabled={isValidating}
+            title="Check each link's status (active / expired / invalid)"
           >
+            {isValidating && <Loader2Icon className="animate-spin" />}
             {isValidating ? 'Validating...' : hasAnyValidation ? 'Re-validate links' : 'Validate links'}
-          </button>
+          </Button>
         )}
         {onToggleAutoValidate && (
-          <Toggle title="Automatically validate links as soon as they're extracted">
-            <input type="checkbox" checked={!!autoValidate} onChange={(e) => onToggleAutoValidate(e.target.checked)} />
+          <Label
+            title="Automatically validate links as soon as they're extracted"
+            className="cursor-pointer text-xs font-normal text-muted-foreground"
+          >
+            <Switch size="sm" checked={!!autoValidate} onCheckedChange={onToggleAutoValidate} />
             Auto-validate
-          </Toggle>
+          </Label>
         )}
-        <button
-          className={copyAsTextButton.join(' ')}
-          type="button"
-          onClick={() => handleCopy('text')}
-          title="Copies exactly what's currently visible in the table"
-        >
-          {`${hasCopyAsText ? 'Copied' : 'Copy'} ${scopeWord} as Text`}
-        </button>
-        <button
-          className={copyAsJSONButton.join(' ')}
-          type="button"
-          onClick={() => handleCopy('json')}
-          title="Copies exactly what's currently visible in the table"
-        >
-          {`${hasCopyAsJSON ? 'Copied' : 'Copy'} ${scopeWord} as JSON`}
-        </button>
-        <button
-          type="button"
-          className="size-small shadow-hard bg-cyan"
-          title="Downloads exactly what's currently visible in the table"
-          onClick={() => {
-            Analytics.fireEvent('links_downloaded', { total: visibleLinks.length });
-            convertToCsv(visibleLinks.map(toCsvRow), 'links');
-          }}
-        >
-          {`Download ${scopeWord} CSV`}
-        </button>
-        {validLinks.length > 0 && (
-          <ScopeGroup title="These actions only include active links from what's currently shown">
-            <ScopeCaption>Valid only</ScopeCaption>
-            <button className={copyValidButton.join(' ')} type="button" onClick={handleCopyValid}>
-              {`${hasCopyValid ? 'Copied' : 'Copy'} as Text`}
-            </button>
-            <button
-              type="button"
-              className="size-small shadow-hard bg-cyan"
-              onClick={() => {
-                Analytics.fireEvent('valid_links_downloaded', { total: validLinks.length });
-                convertToCsv(validLinks.map(toCsvRow), 'valid-links');
-              }}
-            >
-              Download CSV
-            </button>
-          </ScopeGroup>
+        {links.length > 0 && (
+          <DropdownMenu open={isExportOpen} onOpenChange={setIsExportOpen}>
+            <DropdownMenuTrigger render={<Button type="button" size="sm" variant="outline" title="Copy or download the extracted links" />}>
+              Export
+              {isExportOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Scope</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={exportScope} onValueChange={setExportScope}>
+                  <DropdownMenuRadioItem value="shown">{`Shown (${visibleLinks.length})`}</DropdownMenuRadioItem>
+                  {validLinks.length > 0 && (
+                    <DropdownMenuRadioItem value="valid" title="Only active links from what's currently shown">
+                      {`Valid only (${validLinks.length})`}
+                    </DropdownMenuRadioItem>
+                  )}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Export</DropdownMenuLabel>
+                <DropdownMenuItem
+                  closeOnClick={false}
+                  onClick={() => handleCopy('text')}
+                  title="Copies the selected links to your clipboard, one per line"
+                >
+                  {isCopyAsText && <Loader2Icon className="animate-spin" />}
+                  {`${hasCopyAsText ? 'Copied' : 'Copy'} as Text`}
+                </DropdownMenuItem>
+                {exportScope === 'shown' && (
+                  <DropdownMenuItem
+                    closeOnClick={false}
+                    onClick={() => handleCopy('json')}
+                    title="Copies the selected links to your clipboard as a JSON array"
+                  >
+                    {isCopyAsJSON && <Loader2Icon className="animate-spin" />}
+                    {`${hasCopyAsJSON ? 'Copied' : 'Copy'} as JSON`}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem title="Downloads the selected links as a CSV file" onClick={handleDownload}>
+                  Download CSV
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
       </div>
       {isValidating && (
-        <ProgressSection>
-          <ProgressTrack>
-            <ProgressFill $percent={progressPercent} />
-          </ProgressTrack>
-          <ProgressMeta>
-            <CurrentlyValidating title={inFlightLinks?.join('\n')}>
+        <div className="flex w-full flex-col gap-1 py-2">
+          <Progress value={progressPercent} className="gap-0" />
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span className="min-w-0 flex-1 truncate font-mono" title={inFlightLinks?.join('\n')}>
               {inFlightLinks && inFlightLinks.length > 0
                 ? `Validating ${inFlightLinks[0]}${inFlightLinks.length > 1 ? ` (+${inFlightLinks.length - 1} more in flight)` : ''}`
                 : 'Validating...'}
-            </CurrentlyValidating>
+            </span>
             <span>{`${progressDone}/${progressTotal} (${progressPercent}%)${etaHint}`}</span>
-          </ProgressMeta>
-        </ProgressSection>
+          </div>
+        </div>
       )}
-    </ActionsContainer>
+    </div>
   );
 }
 

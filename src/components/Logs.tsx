@@ -1,20 +1,8 @@
-import { styled } from 'styled-components';
+import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 import { convertToCsv } from '@src/utils';
-
-const ActionBar = styled.div`
-  align-items: center;
-  display: flex;
-  justify-content: space-between;
-  padding: 12px 0;
-`;
-
-const Loader = styled.div`
-  border-radius: 50%;
-  height: 20px;
-  position: relative;
-  width: 20px;
-`;
 
 type Log = {
   origin: string;
@@ -33,21 +21,15 @@ interface Props {
 function Logs({ logs, progress, isLoading }: Props) {
   return (
     <>
-      <ActionBar>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-          }}
-        >
+      <div className="flex items-center justify-between py-3">
+        <div className="flex items-center gap-3">
           <p>{progress}</p>
-          {isLoading && <Loader className="with-loader bg-grey" />}
+          {isLoading && <Spinner className="text-muted-foreground" />}
         </div>
-        <button
+        <Button
           type="button"
+          size="sm"
           disabled={isLoading}
-          className="size-small shadow-hard bg-cyan"
           onClick={() =>
             convertToCsv(
               logs.map((log) => ({
@@ -60,31 +42,38 @@ function Logs({ logs, progress, isLoading }: Props) {
           }
         >
           Download csv
-        </button>
-      </ActionBar>
-      <table className="ff-table bordered-rows full-width striped padding-tiny">
-        <tbody>
+        </Button>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-12">#</TableHead>
+            <TableHead>Origin</TableHead>
+            <TableHead>Result</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {logs.map((log, index) => (
-            <tr key={log.href} className="font-mono text-small">
-              <td>
+            <TableRow key={log.href} className="font-mono text-xs">
+              <TableCell>
                 {(logs.length - index).toLocaleString(undefined, {
                   useGrouping: false,
                   minimumIntegerDigits: 3,
                 })}
-              </td>
-              <td>
+              </TableCell>
+              <TableCell>
                 <a target="_blank" href={log?.href} rel="noreferrer">
                   {log?.origin}
                 </a>
-              </td>
-              <td style={{ color: log?.hasError ? 'red' : 'inherit' }}>
+              </TableCell>
+              <TableCell className={log?.hasError ? 'text-destructive' : undefined}>
                 {log?.count > 0 && <p>{`finds ${log?.count} links`}</p>}
                 {log?.errorMessage && <span>{log?.errorMessage}</span>}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </>
   );
 }

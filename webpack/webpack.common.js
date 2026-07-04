@@ -1,6 +1,8 @@
 const path = require('path');
 const CopyPlugin = require('copy-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
+const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
@@ -12,6 +14,7 @@ module.exports = {
   entry: {
     background: path.join(srcDir, 'background.ts'),
     popup: path.join(srcDir, 'popup/index.tsx'),
+    sidepanel: path.join(srcDir, 'sidepanel/index.tsx'),
   },
   output: {
     path: path.join(__dirname, '../dist'),
@@ -38,6 +41,7 @@ module.exports = {
           mangle: true,
         },
       }),
+      new CssMinimizerPlugin(),
     ],
     splitChunks: {
       chunks: 'all',
@@ -72,6 +76,10 @@ module.exports = {
           },
         },
       },
+      {
+        test: /\.css$/,
+        use: [MiniCssExtractPlugin.loader, 'css-loader', 'postcss-loader'],
+      },
     ],
   },
   resolve: {
@@ -82,10 +90,18 @@ module.exports = {
   },
   plugins: [
     new CleanWebpackPlugin(), // Cleans the `dist` folder before each build
+    new MiniCssExtractPlugin({
+      filename: 'css/[name].css',
+    }),
     new HtmlWebpackPlugin({
       template: path.join(srcDir, 'popup/index.html'), // Popup HTML template
       filename: 'popup.html',
       chunks: ['popup'], // Only include the popup script
+    }),
+    new HtmlWebpackPlugin({
+      template: path.join(srcDir, 'sidepanel/index.html'), // Side panel HTML template
+      filename: 'sidepanel.html',
+      chunks: ['sidepanel'], // Only include the side panel script
     }),
     new CopyPlugin({
       patterns: [{ from: '.', to: '../dist', context: 'public' }],

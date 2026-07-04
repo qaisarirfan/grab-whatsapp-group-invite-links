@@ -1,3 +1,6 @@
 dist
 node_modules
 jest.config.ts
+src/components/ui
+src/hooks/use-mobile.ts
+src/lib/utils.ts

@@ -10,3 +10,6 @@ LICENSE
 *.md
 package-lock.json
 fictoan.min.css
+src/components/ui
+src/hooks/use-mobile.ts
+src/lib/utils.ts

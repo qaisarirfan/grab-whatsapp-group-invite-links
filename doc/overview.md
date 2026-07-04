@@ -63,6 +63,7 @@ When on `google.com/search`, the extension collects all result URLs and lets you
 | Scrape logs | Shows per-URL progress and errors during extraction |
 | Validation caching | Results cached for 24 hours in `chrome.storage.local` |
 | Analytics | Anonymous GA4 usage tracking (Measurement Protocol) |
+| Side panel mode | The same app can run in Chrome's side panel (persists alongside the page) instead of the popup, opened via a button or right-click menu |
 
 ---
 
@@ -77,9 +78,13 @@ grab-whatsapp-group-invite-links/
 │   ├── validation.ts          # Link health checking + storage cache
 │   ├── analytics.ts           # GA4 Measurement Protocol client
 │   ├── popup/
-│   │   ├── index.tsx          # Root React app — all state and orchestration
+│   │   ├── index.tsx          # Mounts <App context="popup" />
 │   │   └── index.html         # Popup HTML shell
+│   ├── sidepanel/
+│   │   ├── index.tsx          # Mounts <App context="sidepanel" />
+│   │   └── index.html         # Side panel HTML shell
 │   └── components/
+│       ├── App.tsx            # Shared root — all state and orchestration for both popup and side panel
 │       ├── Header.tsx         # Logo + Buy Me a Coffee
 │       ├── Links.tsx          # Links table with status badges
 │       ├── Actions.tsx        # Sticky action bar (copy, download, validate)
@@ -105,7 +110,7 @@ grab-whatsapp-group-invite-links/
 |---|---|---|
 | UI | React 19 + styled-components | Popup interface |
 | Language | TypeScript 5 | Type safety across all modules |
-| Build | Webpack 5 | Bundles two entry points; splits react/vendor chunks |
+| Build | Webpack 5 | Bundles three entry points (background, popup, side panel); splits react/vendor chunks |
 | HTTP | axios + Bottleneck | Fetching pages with rate limiting |
 | Concurrency | p-limit | Additional concurrency cap for bulk extract |
 | HTML parsing | cheerio | Extracts links from fetched page HTML |
@@ -157,6 +162,8 @@ user clicks "Validate links"
 | `activeTab` | Read the URL and title of the currently open tab |
 | `scripting` | Inject the anchor-tag collector into the active tab's DOM |
 | `storage` | Cache validation results and persist analytics IDs |
+| `sidePanel` | Let the extension's UI run in Chrome's side panel as an alternative to the popup |
+| `contextMenus` | Add the right-click "Open in side panel" menu item |
 | `https://*/*` `http://*/*` | Fetch arbitrary pages during bulk Google Search extraction |
 
 ---

@@ -7,6 +7,8 @@ This Chrome extension helps you find WhatsApp group invite links. Everything hap
 1. **On any regular webpage** — it scans the page you are on and instantly shows any WhatsApp group invite links already present on that page.
 2. **On Google Search results** — it visits each search result link on your behalf, scrapes its content, and collects any WhatsApp group invite links hidden inside those pages.
 
+You can use the extension two ways: as a **popup** (click the toolbar icon, it closes when you click elsewhere) or as a **side panel** (stays open next to the page while you browse). Both show the exact same features — pick whichever fits how you work.
+
 ---
 
 ## How to install
@@ -42,12 +44,22 @@ A new browser tab opens automatically the first time you install the extension, 
 
 A **Help & FAQs** tab is always available in the popup, on every page and in every mode — you don't need to leave the extension or come back to this guide. It has a short how-to-use recap, the same badge legend as below, and an expandable FAQ list covering the same questions as the section further down this page.
 
+### Using the side panel instead of the popup
+
+If you'd rather keep the extension open while you browse (instead of it closing every time you click elsewhere), open it in Chrome's side panel:
+
+- Click the **Open in side panel** button next to the tabs at the top of the popup, or
+- Right-click the extension's toolbar icon (or right-click anywhere on the page) and choose **Open in side panel** from the menu.
+
+The side panel shows the exact same tabs, buttons, and badges as the popup — it just stays docked next to the page instead of closing automatically, and it resizes to however wide you drag it.
+
 ---
 
 ## What the buttons do
 
 | Button | Where it appears | What it does |
 |---|---|---|
+| **Open in side panel** | Next to the tabs, popup only | Moves the extension into Chrome's side panel, so it stays open next to the page instead of closing when you click away |
 | **Extract** | Before the first extraction (Google Search only) | Starts scraping all Google search results for WhatsApp links |
 | **Extract again** | Action bar, once at least one link has been found (Google Search only) | Re-runs the extraction from scratch |
 | **Validate links** | Action bar, once at least one link has been found | Checks each found link to see if it's still active or expired |
@@ -99,6 +111,7 @@ You can download the full log as its own CSV file from this tab, separate from t
 - **Local storage**: Validation results (cached for 24 hours) and an anonymous usage ID are stored only inside your own browser, using Chrome's storage permission — never uploaded anywhere except as anonymous analytics, below.
 - **Analytics**: Every time you open the popup, the web address and title of whichever page you're currently on are sent to Google Analytics, along with anonymous usage events (such as which buttons you click and how many links were found). This is used only to understand how the extension is used. It isn't tied to your name or Google account, and it never includes passwords, form content, or the WhatsApp links you find.
 - The extension does not sell your data, and there is no separate server run by the developer that stores what you browse.
+- **Side panel**: Opening the side panel (via the button or right-click menu) doesn't read or send anything extra — it's the same extension shown in a different part of the browser window.
 
 ---
 
@@ -130,6 +143,9 @@ Yes. **Extract again** re-runs the scrape from scratch (Google Search mode, once
 
 **A new tab opened when I installed or updated the extension — is that normal?**
 Yes. It opens automatically on install and on update to show more information about the extension. You can close it at any time.
+
+**What's the difference between the popup and the side panel?**
+They're the same extension with the same tabs, buttons, and badges. The popup closes as soon as you click elsewhere; the side panel stays docked next to the page until you close it, which is handy if you're checking links while browsing multiple pages. Use whichever fits how you work — nothing about link extraction or validation changes between them.
 
 **What happens when I remove the extension?**
 Chrome opens a short feedback page. This is optional — you can close it without filling anything in.
