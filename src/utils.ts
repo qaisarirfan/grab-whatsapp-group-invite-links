@@ -68,6 +68,27 @@ export const handleError = (error: string) => ({
   errorMessage: error.replace('AxiosError: ', ''),
 });
 
+// Injected via chrome.scripting.executeScript, so this runs in the page's context and
+// cannot close over other module imports (e.g. isValidURL above) — the URL regex below
+// is intentionally duplicated rather than shared.
+export const getAllAnchorTags = () => {
+  const isGoogleSearch = `${window?.location?.origin}${window?.location?.pathname}` === 'https://www.google.com/search';
+
+  let tags = document.querySelectorAll('a');
+  if (isGoogleSearch) {
+    tags = document.querySelectorAll('#search a');
+  }
+  const ls = [];
+  for (let idx = 0; idx < tags.length; idx += 1) {
+    const value = tags[idx];
+    const res = value.href.match(/(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)/g);
+    if (res !== null) {
+      ls.push(value.href);
+    }
+  }
+  return Array.from(new Set(ls));
+};
+
 export const convertToCsv = (data: Record<string, unknown>[], filename: string) => {
   const opts = {};
   const parser = new StreamParser(opts, { objectMode: true });

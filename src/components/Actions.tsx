@@ -3,24 +3,10 @@ import { useEffect, useState } from 'react';
 // Deep imports (instead of `from 'lucide-react'`) avoid pulling the whole icon set into the
 // bundle — lucide-react's barrel file isn't tree-shaken by this webpack config and previously
 // added ~1.5MB to vendors.js for 3 icons.
-import ChevronDownIcon from 'lucide-react/dist/esm/icons/chevron-down.mjs';
-import ChevronUpIcon from 'lucide-react/dist/esm/icons/chevron-up.mjs';
 import Loader2Icon from 'lucide-react/dist/esm/icons/loader-2.mjs';
 
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 
 import Analytics from '@src/analytics';
@@ -28,7 +14,8 @@ import { convertToCsv, copyToClipboard } from '@src/utils';
 import type { LinkValidation } from '@src/validation';
 import { getStatusLabel } from '@src/validation';
 
-type ExportScope = 'shown' | 'valid';
+import ExportMenu, { type ExportScope } from './ExportMenu';
+import ValidationProgress from './ValidationProgress';
 
 interface PropTypes {
   isGoogleSearchPage: boolean;
@@ -148,16 +135,6 @@ function Actions({
     convertToCsv(activeLinks.map(toCsvRow), fileName);
   };
 
-  const progressDone = validationProgress?.done ?? 0;
-  const progressTotal = validationProgress?.total ?? links.length;
-  const remaining = progressTotal - progressDone;
-  // Bottleneck's validationLimiter (src/validation.ts) launches roughly 2 validations/sec
-  // (minTime: 500ms) regardless of concurrency
-  const VALIDATIONS_PER_MINUTE = 120;
-  const etaMinutes = Math.ceil(remaining / VALIDATIONS_PER_MINUTE);
-  const etaHint = remaining > VALIDATIONS_PER_MINUTE ? ` · ~${etaMinutes}m remaining` : '';
-  const progressPercent = progressTotal > 0 ? Math.min(100, Math.round((progressDone / progressTotal) * 100)) : 0;
-
   return (
     <div className="flex flex-row flex-wrap items-center justify-between gap-2 py-3">
       <div className="flex items-center gap-3">
@@ -203,64 +180,24 @@ function Actions({
           </Label>
         )}
         {links.length > 0 && (
-          <DropdownMenu open={isExportOpen} onOpenChange={setIsExportOpen}>
-            <DropdownMenuTrigger render={<Button type="button" size="sm" variant="outline" title="Copy or download the extracted links" />}>
-              Export
-              {isExportOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>Scope</DropdownMenuLabel>
-                <DropdownMenuRadioGroup value={exportScope} onValueChange={setExportScope}>
-                  <DropdownMenuRadioItem value="shown">{`Shown (${visibleLinks.length})`}</DropdownMenuRadioItem>
-                  {validLinks.length > 0 && (
-                    <DropdownMenuRadioItem value="valid" title="Only active links from what's currently shown">
-                      {`Valid only (${validLinks.length})`}
-                    </DropdownMenuRadioItem>
-                  )}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuGroup>
-                <DropdownMenuLabel>Export</DropdownMenuLabel>
-                <DropdownMenuItem
-                  closeOnClick={false}
-                  onClick={() => handleCopy('text')}
-                  title="Copies the selected links to your clipboard, one per line"
-                >
-                  {isCopyAsText && <Loader2Icon className="animate-spin" />}
-                  {`${hasCopyAsText ? 'Copied' : 'Copy'} as Text`}
-                </DropdownMenuItem>
-                {exportScope === 'shown' && (
-                  <DropdownMenuItem
-                    closeOnClick={false}
-                    onClick={() => handleCopy('json')}
-                    title="Copies the selected links to your clipboard as a JSON array"
-                  >
-                    {isCopyAsJSON && <Loader2Icon className="animate-spin" />}
-                    {`${hasCopyAsJSON ? 'Copied' : 'Copy'} as JSON`}
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem title="Downloads the selected links as a CSV file" onClick={handleDownload}>
-                  Download CSV
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ExportMenu
+            exportScope={exportScope}
+            hasCopyAsJSON={hasCopyAsJSON}
+            hasCopyAsText={hasCopyAsText}
+            isCopyAsJSON={isCopyAsJSON}
+            isCopyAsText={isCopyAsText}
+            isOpen={isExportOpen}
+            onCopy={handleCopy}
+            onDownload={handleDownload}
+            onOpenChange={setIsExportOpen}
+            onScopeChange={setExportScope}
+            validLinksCount={validLinks.length}
+            visibleLinksCount={visibleLinks.length}
+          />
         )}
       </div>
       {isValidating && (
-        <div className="flex w-full flex-col gap-1 py-2">
-          <Progress value={progressPercent} className="gap-0" />
-          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span className="min-w-0 flex-1 truncate font-mono" title={inFlightLinks?.join('\n')}>
-              {inFlightLinks && inFlightLinks.length > 0
-                ? `Validating ${inFlightLinks[0]}${inFlightLinks.length > 1 ? ` (+${inFlightLinks.length - 1} more in flight)` : ''}`
-                : 'Validating...'}
-            </span>
-            <span>{`${progressDone}/${progressTotal} (${progressPercent}%)${etaHint}`}</span>
-          </div>
-        </div>
+        <ValidationProgress fallbackTotal={links.length} inFlightLinks={inFlightLinks} validationProgress={validationProgress} />
       )}
     </div>
   );

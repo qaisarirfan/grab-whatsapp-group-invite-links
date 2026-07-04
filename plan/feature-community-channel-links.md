@@ -1,6 +1,8 @@
 # Feature Plan: WhatsApp Community & Channel Link Extraction
 
-Created: 2026-06-23
+Created: 2026-06-23. Not yet implemented as of 2026-07-04.
+
+> **Architecture note (2026-07-04):** since this plan was written, `src/popup/index.tsx` was reduced to a thin mount wrapper (`createRoot` + `<App context="popup" />`). All the state and flow this plan describes as living in `popup/index.tsx` now lives in `src/components/App.tsx` and two extracted hooks, `src/hooks/use-link-validation.ts` and `src/hooks/use-google-search-scrape.ts`. The Links table was also split into `src/components/Links.tsx` (container: filtering, dedupe, virtualization) + `src/components/LinkRow.tsx` (one row) + `src/components/LinkFilterBar.tsx` (status filter chips), and the copy/download UI now lives in `src/components/ExportMenu.tsx` rather than directly in `Actions.tsx`. Steps below have been updated to point at the current file, but the underlying design (add a `LinkType` union, an `extractLinkWithType()` function, thread `WhatsAppLink[]` through state) is unchanged.
 
 ---
 
@@ -106,23 +108,29 @@ export const extractWhatsappLinks = (htmlContent: string): WhatsAppLink[] => {
 
 ---
 
-## Step 2 — Update `src/popup/index.tsx` — state and data flow
+## Step 2 — Update `src/components/App.tsx` and its hooks — state and data flow
 
 ### 2a. Change `links` state from `string[]` to `WhatsAppLink[]`
 
+`links` is declared in `src/components/App.tsx` and passed down into `useLinkValidation` (`src/hooks/use-link-validation.ts`) and `useGoogleSearchScrape` (`src/hooks/use-google-search-scrape.ts`), so the type change ripples through all three files, not just one.
+
 ```ts
-// Before
+// Before (src/components/App.tsx)
 const [links, setLinks] = useState<string[]>([]);
 
 // After
 const [links, setLinks] = useState<WhatsAppLink[]>([]);
 ```
 
+`useLinkValidation(links, setLinks)` and `useGoogleSearchScrape({ ..., setLinks, ... })` both currently type their `links`/`setLinks` parameters as `string[]` / `Dispatch<SetStateAction<string[]>>` — those signatures need updating too (or genericizing over `WhatsAppLink[]`). `validateAllLinks`/`validateMultipleLinksWithProgress` still operate on plain URL strings (see Step 3), so both hooks need to map `link.url` in and merge validation results back onto the matching `WhatsAppLink` in state.
+
 ### 2b. Update `getAllAnchorTags` (the injected DOM function)
 
-No changes needed — it returns raw hrefs. Type detection happens in the extension context after injection.
+No changes needed — it returns raw hrefs (still in `src/utils.ts`, module-scope, injected via `chrome.scripting.executeScript`). Type detection happens in the extension context after injection.
 
 ### 2c. Update direct-page mode link filtering
+
+This logic is now in the mount effect inside `src/components/App.tsx` (not `popup/index.tsx`):
 
 ```ts
 // Before
@@ -138,31 +146,35 @@ setLinks(unique);
 
 ### 2d. Update `getWhatsappLink()` — Google Search scrape mode
 
-`extractWhatsappLinks` now returns `WhatsAppLink[]`, so the accumulator array type changes accordingly. Deduplication uses `url` as the key.
+`getWhatsappLink` now lives in `src/hooks/use-google-search-scrape.ts`. `extractWhatsappLinks` (`src/utils.ts`) would return `WhatsAppLink[]`, so the accumulator array type in `getWhatsappLink`/`fetchAll` changes accordingly. Deduplication uses `url` as the key. Note this hook also fires `validateLinkWithStorage(link)` per extracted link as it's found (for auto-validate) — that call site needs `link.url` too.
 
 ### 2e. Add a type filter to state
+
+Filter/dedupe state (`statusFilter`, `hideDuplicates`) already lives in `src/components/Links.tsx`, not `App.tsx` — a `typeFilter` would naturally join them there rather than in `App.tsx`:
 
 ```ts
 const [typeFilter, setTypeFilter] = useState<LinkType | 'all'>('all');
 
-const filteredLinks = typeFilter === 'all'
+const typeFilteredLinks = typeFilter === 'all'
   ? links
   : links.filter(l => l.type === typeFilter);
 ```
 
-Pass `filteredLinks` to `<Links>` instead of `links`.
+Apply this alongside the existing `filterLinksByStatus`/`dedupeLinksByGroupName` pipeline (see Step 4).
 
 ---
 
 ## Step 3 — Update `src/validation.ts`
 
-No structural changes needed. `validateLink` and `validateLinkWithStorage` already operate on the URL string. Pass `link.url` instead of the raw string at each call site.
+No structural changes needed. `validateLink`, `validateLinkWithStorage`, and the newer `getStatusCounts`/`filterLinksByStatus`/`dedupeLinksByGroupName` helpers all key off the plain URL string. Every call site (`src/hooks/use-link-validation.ts`, `src/hooks/use-google-search-scrape.ts`, `src/hooks/use-cached-validations.ts`, `src/components/Actions.tsx`) needs to pass `link.url` instead of a raw string, and `Record<string, LinkValidation>` maps stay keyed by URL — components look up `validations[link.url]` rather than `validations[link]`.
 
 ---
 
-## Step 4 — Update `src/components/Links.tsx` — display
+## Step 4 — Update the Links table — display
 
-### 4a. Add a type badge column
+The table is now split across three files; each needs a piece of this:
+
+### 4a. Add a type badge, rendered per-row in `src/components/LinkRow.tsx`
 
 ```tsx
 const TYPE_LABEL: Record<LinkType, string> = {
@@ -178,46 +190,45 @@ const TYPE_COLOR: Record<LinkType, string> = {
 };
 ```
 
-Add a `<TypeBadge>` styled component (similar to existing `<StatusBadge>`) and render it next to each link in the table.
+Render a `<Badge>` (shadcn, `@/components/ui/badge` — the same component `LinkRow` already uses for the status badge) next to each link's status badge.
 
-### 4b. Add type filter buttons above the table
+### 4b. Add type filter buttons in `src/components/LinkFilterBar.tsx`
 
-```tsx
-<div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-  {(['all', 'group', 'community', 'channel'] as const).map(t => (
-    <button
-      key={t}
-      className={`size-small ${typeFilter === t ? 'bg-green' : 'bg-grey'}`}
-      onClick={() => setTypeFilter(t)}
-    >
-      {t === 'all' ? `All (${links.length})` : `${TYPE_LABEL[t]} (${links.filter(l => l.type === t).length})`}
-    </button>
-  ))}
-</div>
-```
+`LinkFilterBar` already renders one button per `StatusFilter` value with live counts (see `FILTER_KEYS`/`statusCounts`). A parallel `typeFilter` row would follow the same pattern — a `TYPE_FILTER_KEYS` array reusing the existing `Button` + count-badge markup, driven by counts computed alongside `getStatusCounts` in `src/components/Links.tsx`.
+
+### 4c. Thread `typeFilter` through `src/components/Links.tsx`
+
+`Links.tsx` already composes `statusFilter` + `hideDuplicates` into `displayedLinks` before handing rows to `TableVirtuoso`/`LinkRow`; add `typeFilter` as one more stage in that pipeline (`filterLinksByStatus` → type filter → `dedupeLinksByGroupName`).
 
 ---
 
-## Step 5 — Update `src/components/Actions.tsx` — export
+## Step 5 — Update `src/components/ExportMenu.tsx` and `src/components/Actions.tsx` — export
 
-### 5a. Update CSV export to include type column
+Copy/download logic (`handleCopy`, `handleDownload`, `toCsvRow`) currently lives in `src/components/Actions.tsx` and operates on `activeLinks: string[]`; `src/components/ExportMenu.tsx` only renders the menu UI and calls back into `Actions`. With typed links, `Actions.tsx` is still the place to update:
+
+### 5a. Update CSV export to include a type column
 
 ```ts
-convertToCsv(
-  links.map(link => ({ Type: link.type, URL: link.url })),
-  'links'
-);
+const toCsvRow = (link: WhatsAppLink) => ({
+  Type: link.type,
+  Name: validations?.[link.url]?.name ?? '',
+  Status: validations?.[link.url] ? getStatusLabel(validations[link.url].status) : 'Not checked',
+  LastValidated: validations?.[link.url]?.lastValidated ? new Date(validations[link.url].lastValidated).toLocaleDateString() : '',
+  URL: link.url,
+});
 ```
 
 ### 5b. Update clipboard copy
 
 ```ts
 // Copy as Text — one URL per line (type prefix optional)
-links.map(l => l.url).join('\r\n')
+activeLinks.map(l => l.url).join('\r\n')
 
 // Copy as JSON — include type
-JSON.stringify(links)
+JSON.stringify(activeLinks)
 ```
+
+`ExportMenu.tsx` itself needs no changes — it's agnostic to what `activeLinks` contains.
 
 ---
 
@@ -256,10 +267,10 @@ This is a breaking change to the `links` state shape (`string[]` → `WhatsAppLi
 1. Add `src/types.ts` with `LinkType` and `WhatsAppLink`.
 2. Add new regex constants and `extractLinkWithType()` to `utils.ts` without removing old functions.
 3. Update `extractWhatsappLinks()`.
-4. Update `popup/index.tsx` state and all consumers.
-5. Update `Links.tsx` and `Actions.tsx`.
+4. Update `App.tsx` state and its two hooks (`use-link-validation.ts`, `use-google-search-scrape.ts`) and all their consumers.
+5. Update `Links.tsx`, `LinkRow.tsx`, `LinkFilterBar.tsx`, and `Actions.tsx`.
 6. Remove old `inviteLink()` once no call site uses it.
-7. Update `validation.ts` call sites to pass `.url`.
+7. Update `validation.ts` call sites (and `use-cached-validations.ts`) to pass/key on `.url`.
 
 ---
 
@@ -282,8 +293,13 @@ This is a breaking change to the `links` state shape (`string[]` → `WhatsAppLi
 | `src/types.ts` | New file |
 | `src/utils.ts` | Add new regex, `extractLinkWithType()`, update `extractWhatsappLinks()` |
 | `src/constants.ts` | Add channel host constant |
-| `src/popup/index.tsx` | State type change, filter state, updated flow |
-| `src/components/Links.tsx` | Type badges, filter buttons |
-| `src/components/Actions.tsx` | CSV/copy format update |
-| `src/validation.ts` | Call site update (`.url` instead of raw string) |
+| `src/components/App.tsx` | `links` state type change, mount-effect filtering update |
+| `src/hooks/use-link-validation.ts` | `links`/`setLinks` typing, pass `.url` to validation calls |
+| `src/hooks/use-google-search-scrape.ts` | `getWhatsappLink`/`fetchAll` accumulator typing, `.url` in auto-validate call |
+| `src/hooks/use-cached-validations.ts` | Key `validations` lookups by `.url` |
+| `src/components/Links.tsx` | Add `typeFilter` state, thread through the existing filter/dedupe pipeline |
+| `src/components/LinkRow.tsx` | Render type badge per row |
+| `src/components/LinkFilterBar.tsx` | Add type filter buttons alongside status filter chips |
+| `src/components/Actions.tsx` | CSV/copy format update (`toCsvRow`, `handleCopy`) |
+| `src/validation.ts` | Call site update (`.url` instead of raw string); no structural change |
 | `src/analytics.ts` | Add type breakdown to events |

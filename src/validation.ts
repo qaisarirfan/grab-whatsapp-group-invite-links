@@ -1,12 +1,12 @@
 import axios from 'axios';
-import axiosRetry from 'axios-retry';
+import axiosRetry, { exponentialDelay, isNetworkOrIdempotentRequestError } from 'axios-retry';
 import Bottleneck from 'bottleneck';
 import { load } from 'cheerio';
 
 axiosRetry(axios, {
   retries: 3,
-  retryDelay: axiosRetry.exponentialDelay,
-  retryCondition: (error) => error.response?.status === 429 || axiosRetry.isNetworkOrIdempotentRequestError(error),
+  retryDelay: exponentialDelay,
+  retryCondition: (error) => error.response?.status === 429 || isNetworkOrIdempotentRequestError(error),
 });
 
 export type LinkStatus = 'pending' | 'valid' | 'expired' | 'invalid' | 'rate-limited';
@@ -24,6 +24,8 @@ export interface LinkValidation {
 export interface StorageData {
   validations: Record<string, LinkValidation>;
 }
+
+export type StatusFilter = 'all' | LinkStatus;
 
 // Configure rate limiter for validation (2 requests per second)
 const validationLimiter = new Bottleneck({
@@ -169,6 +171,37 @@ export const getStatusLabel = (status: LinkStatus): string => {
       return 'Pending';
   }
 };
+
+export const getStatusCounts = (links: string[], validations: Record<string, LinkValidation>): Record<StatusFilter, number> =>
+  links.reduce<Record<StatusFilter, number>>(
+    (acc, link) => {
+      const status = validations[link]?.status || 'pending';
+      acc[status] += 1;
+      acc.all += 1;
+      return acc;
+    },
+    { all: 0, pending: 0, valid: 0, expired: 0, invalid: 0, 'rate-limited': 0 }
+  );
+
+export const filterLinksByStatus = (links: string[], validations: Record<string, LinkValidation>, statusFilter: StatusFilter): string[] =>
+  links.filter((link) => {
+    if (statusFilter === 'all') return true;
+    return (validations[link]?.status || 'pending') === statusFilter;
+  });
+
+// Collapses invite links that resolve to the same group name — links without a resolved name are kept as-is.
+export const dedupeLinksByGroupName = (links: string[], validations: Record<string, LinkValidation>): string[] =>
+  Object.values(
+    links.reduce<Record<string, string>>((acc, link) => {
+      const name = validations[link]?.name;
+      if (name && !acc[name]) {
+        acc[name] = link;
+      } else if (!name) {
+        acc[link] = link;
+      }
+      return acc;
+    }, {})
+  );
 
 export const getStatusTooltip = (status: LinkStatus): string => {
   switch (status) {

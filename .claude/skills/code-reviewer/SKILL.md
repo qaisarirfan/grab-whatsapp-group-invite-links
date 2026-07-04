@@ -22,6 +22,7 @@ Act as a **senior solution architect**. Be direct, pragmatic, and opinionated. F
 - **No side effects at module scope** — utility files must not execute network/storage calls on import
 - **Promises handled** — every `async` call is awaited or `.catch()`-ed; no floating promises (especially fire-and-forget `chrome.storage`/`axios` calls)
 - **Pure functions preferred** — isolate side effects; keep extraction/parsing logic (`utils.ts`) testable
+- **Conditional classNames via `cn()`** — any conditional or merged `className` must use `cn()` from `src/lib/utils.ts` (clsx + tailwind-merge), not a template literal or ternary; those silently leak `"false"`/`"undefined"` into the class list when the condition doesn't hold
 
 ## Workflow
 
@@ -84,7 +85,7 @@ After emitting the report, apply every finding as a code edit:
 | `src/utils.ts` / `src/validation.ts` | Regex correctness for `chat.whatsapp.com` links, `axios`/`Bottleneck`/`axios-retry` timeout and rate-limit config, `cheerio` selector fragility, cache versioning (`cacheVersion`/`CACHE_VERSION`) |
 | `src/popup/index.tsx` | State/effect correctness on popup open (mount-once `useEffect`), `chrome.scripting.executeScript` injected function scoping, tab-switching logic, memory of in-flight/loading state across async fetch waves |
 | `src/background.ts` | Service worker stays side-effect-light (install/update/uninstall URLs only) — no business logic creep |
-| `src/components/*.tsx` | Props typed explicitly, `styled-components` usage, accessibility of buttons/icons, controlled vs uncontrolled inputs |
+| `src/components/*.tsx` | Props typed explicitly, `styled-components` usage, accessibility of buttons/icons, controlled vs uncontrolled inputs, conditional `className` built with `cn()` (not template literals/ternaries) |
 | `src/analytics.ts` | GA4 Measurement Protocol payload shape, `chrome.storage.local`/`chrome.storage.session` client/session ID handling, event names free of reserved GA4 words, no PII in event params |
 | `public/manifest.json` | Permissions stay minimal (`activeTab`, `scripting`, `storage`) and `host_permissions` scope is justified — flag any broadening |
 | `webpack/*.js` | Both entry points (`background`, `popup`) still resolve, path aliases (`@components/*`, `@src/*`) stay in sync with `tsconfig.json` |

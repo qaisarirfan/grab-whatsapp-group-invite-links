@@ -1,22 +1,28 @@
 # Future Improvement Plans
 
-Identified during code review on 2026-06-23. Ordered by priority.
+Identified during code review on 2026-06-23. Re-scanned against the codebase on 2026-07-04, after the Tailwind/shadcn migration and the split of `src/popup/index.tsx`'s logic into `src/components/App.tsx` + `src/hooks/*`. Ordered by priority; status reflects the 2026-07-04 re-scan.
+
+---
+
+## Resolved since 2026-06-23
+
+- **BUG-2** — `validateLink` now makes a real `axios.get()` request (not `mode: 'no-cors'`), so `404`/`410`/`429` checks are reachable and meaningful. Already documented in `doc/technical.md`.
+- **CLEAN-1** — `src/Untitled-1.ts` no longer exists in the repo.
+- **ARCH-2** — `getAllAnchorTags` is now a module-scope export in `src/utils.ts`, imported wherever it's injected (`src/components/App.tsx`). No longer redefined per render.
 
 ---
 
 ## Bug Fixes
 
-### BUG-1 — `convertToCsv` crashes and may produce empty files
+### BUG-1 — `convertToCsv` may throw and may produce empty files — STILL OPEN
 
-**File:** `src/utils.ts` (lines 88–93)
+**File:** `src/utils.ts` (`convertToCsv`, currently lines 92–117)
 
-**Problems:**
-1. `pom` (the hidden `<a>` element) is never appended to `document.body` before `.click()` is called. `document.body.removeChild(pom)` always throws a `NotFoundError`.
-2. `StreamParser` is event-driven. The `Blob` is constructed synchronously right after `parser.write()` calls, before the parser has flushed all data. The resulting CSV may be empty.
+**Problems (unchanged from the original review):**
+1. `pom` (the hidden `<a>` element) is still never appended to `document.body` before `.click()` is called, and `document.body.removeChild(pom)` is still called on it afterwards — this throws a `NotFoundError` since `pom` was never a child of `document.body`.
+2. `StreamParser` is event-driven. `parser.onEnd` only logs to the console; the actual `Blob`/download-trigger code runs synchronously right after the `parser.write()` loop, and `parser.end()` is never called at all, so the parser is never told the input is finished.
 
-**Fix:**
-- Append `pom` to the DOM before clicking, then remove it after.
-- Move the `Blob` creation and download trigger inside the `onEnd` callback so the full CSV string is available.
+**Fix:** Same as originally proposed — append `pom` to the DOM before clicking (then remove it), and move the `Blob` creation + download trigger into `parser.onEnd`, calling `parser.end()` after the `write()` loop so `onEnd` actually fires:
 
 ```ts
 parser.onEnd = () => {
@@ -36,38 +42,31 @@ parser.end();
 
 ---
 
-### BUG-2 — `validateLink` status code checks are unreachable
+### BUG-2 — `validateLink` status code checks are unreachable — RESOLVED
 
-**File:** `src/validation.ts` (lines 44–48)
-
-**Problem:**
-With `mode: 'no-cors'`, the browser always returns an opaque response with `status === 0`. The checks for `404`, `410`, and `429` can never be true. All reachable servers are returned as `'valid'`, regardless of their actual HTTP status. The existing code comment (line 38) acknowledges this.
-
-**Options (pick one):**
-- **Option A (minimal):** Remove the dead status-code branches and document explicitly that opaque = server reachable = `'valid'` by convention.
-- **Option B (correct):** Route validation requests through the background service worker using `chrome.runtime.sendMessage` so they are not subject to CORS restrictions and real status codes are available.
+See "Resolved since 2026-06-23" above.
 
 ---
 
 ## Dead Code Removal
 
-### CLEAN-1 — Delete `src/Untitled-1.ts`
+### CLEAN-1 — Delete `src/Untitled-1.ts` — RESOLVED
 
-Entirely commented-out scratch code. No imports reference it. Safe to delete.
-
----
-
-### CLEAN-2 — Delete `src/logs.ts`
-
-File contains only `export default [];`. Nothing in the codebase imports it. Safe to delete.
+See "Resolved since 2026-06-23" above.
 
 ---
 
-### CLEAN-3 — `otherLinks` state is collected but never shown
+### CLEAN-2 — Delete `src/logs.ts` — STILL OPEN
 
-**File:** `src/popup/index.tsx` (line 51, line 220–225)
+File still contains only `export default [];`. Confirmed via repo-wide search that nothing imports it (not to be confused with `src/components/Logs.tsx`, the log-table component, which is unrelated and in active use). Safe to delete.
 
-`otherLinks` is populated when a non-Google page has no WhatsApp links, but only its `.length` is shown to the user. The links themselves are never rendered.
+---
+
+### CLEAN-3 — `otherLinks` state is collected but never shown — STILL OPEN
+
+**Files:** `src/components/App.tsx` (state declaration and the `setOtherLinks` call in the mount effect), `src/components/EmptyState.tsx` (only `otherLinksCount` is rendered, in the "no WhatsApp group link on this page" message)
+
+`otherLinks` is populated when a non-Google page has no WhatsApp links, but only its `.length` (passed down as `otherLinksCount`) is shown to the user. The links themselves are never rendered.
 
 **Options (pick one):**
 - Render the links in a collapsible section so the user can inspect what was found on the page.
@@ -77,43 +76,39 @@ File contains only `export default [];`. Nothing in the codebase imports it. Saf
 
 ## Architecture
 
-### ARCH-1 — Redundant concurrency limiting
+### ARCH-1 — Redundant concurrency limiting — STILL OPEN (numbers changed)
 
-**Files:** `src/popup/index.tsx` (line 170), `src/utils.ts` (lines 45–48)
+**Files:** `src/hooks/use-google-search-scrape.ts` (`fetchAll`, `pLimit(100)`), `src/utils.ts` (`limiter`, `Bottleneck({ maxConcurrent: 50, minTime: 200 })` inside `fetchData`)
 
-`fetchAll` wraps requests in both `pLimit(50)` and `Bottleneck(maxConcurrent: 50, minTime: 200ms)`. These enforce the same ceiling. `Bottleneck` alone is sufficient.
+`fetchAll` wraps requests in both `pLimit(100)` and `fetchData`'s `Bottleneck(maxConcurrent: 50, minTime: 200ms)`. Since `Bottleneck`'s ceiling (50 concurrent) is tighter than `pLimit`'s (100), the `pLimit` wrapper never actually binds — it's dead weight. `Bottleneck` alone is sufficient.
 
-**Fix:** Remove the `pLimit` import and the `limit()` wrapper in `fetchAll`. Let `Bottleneck` inside `fetchData` handle concurrency.
-
----
-
-### ARCH-2 — `getAllAnchorTags` defined inside the React component
-
-**File:** `src/popup/index.tsx` (lines 58–74)
-
-The function is serialised and injected into the page via `chrome.scripting.executeScript`. It does not close over any React state, so defining it inside the component serves no purpose — it is re-created on every render unnecessarily.
-
-**Fix:** Move `getAllAnchorTags` outside the `Popup` component (module scope).
+**Fix:** Remove the `p-limit` dependency and the `limit()` wrapper in `fetchAll`. Let `Bottleneck` inside `fetchData` handle concurrency.
 
 ---
 
-### ARCH-3 — `ref.current` boolean flag is an implicit hidden state
+### ARCH-2 — `getAllAnchorTags` defined inside the React component — RESOLVED
 
-**File:** `src/popup/index.tsx` (line 44, line 167)
+See "Resolved since 2026-06-23" above.
 
-`ref.current` is set to `true` at the start of `fetchAll` and gates several UI branches to determine "has extraction been run". This information is already derivable from `logs.length > 0`, which is reactive state.
+---
 
-**Fix:** Replace `ref.current` checks with `logs.length > 0`. Remove the `ref`.
+### ARCH-3 — `ref.current` boolean flag is an implicit hidden state — STILL OPEN (original fix no longer sufficient)
+
+**File:** `src/hooks/use-google-search-scrape.ts` (`hasFetchedRef`), consumed in `src/components/App.tsx` (`showLogsTab`, `showLinksTab`, `showCenteredLayout`)
+
+`hasFetchedRef.current` is set to `true` at the start of `fetchAll` and gates whether the Logs/Links tabs are offered at all. The originally proposed fix (`logs.length > 0`) no longer works: `fetchAll` now calls `setLogs([])` at the start of every run, so `logs.length` is `0` both "before the first extraction" and "mid-extraction, log rows not in yet" — two states the UI needs to tell apart (the ref is what lets `showLinksTab` stay true, showing a loading spinner, instead of falling back to the empty state mid-scrape).
+
+**Fix:** If still worth de-implicitizing, replace the ref with explicit reactive state (e.g. `hasFetched` state set via `setHasFetched(true)` alongside `setLogs([])`), rather than trying to derive it from `logs.length`.
 
 ---
 
 ## Security / Config Practice
 
-### SEC-1 — GA4 credentials hardcoded in source
+### SEC-1 — GA4 credentials hardcoded in source — STILL OPEN
 
 **File:** `src/analytics.ts` (lines 5–6)
 
-`MEASUREMENT_ID` (`G-9S9H43Y54R`) and `API_SECRET` (`g6w2emsLSLuACC3e443xaQ`) are committed in plain text. While GA4 Measurement Protocol secrets are lower-risk than database credentials, they can be abused to inject false analytics events.
+`MEASUREMENT_ID` (`G-9S9H43Y54R`) and `API_SECRET` (`g6w2emsLSLuACC3e443xaQ`) are still committed in plain text; `webpack/webpack.common.js` has no `DefinePlugin` wiring for them. While GA4 Measurement Protocol secrets are lower-risk than database credentials, they can be abused to inject false analytics events.
 
 **Fix:**
 1. Add `.env` to `.gitignore`.
@@ -139,14 +134,14 @@ The function is serialised and injected into the page via `chrome.scripting.exec
 
 ## Summary
 
-| ID | Priority | Category | File |
-|---|---|---|---|
-| BUG-1 | High | Bug | `src/utils.ts` |
-| BUG-2 | High | Bug | `src/validation.ts` |
-| CLEAN-1 | Low | Clean-up | `src/Untitled-1.ts` |
-| CLEAN-2 | Low | Clean-up | `src/logs.ts` |
-| CLEAN-3 | Low | Clean-up | `src/popup/index.tsx` |
-| ARCH-1 | Medium | Architecture | `src/popup/index.tsx`, `src/utils.ts` |
-| ARCH-2 | Low | Architecture | `src/popup/index.tsx` |
-| ARCH-3 | Low | Architecture | `src/popup/index.tsx` |
-| SEC-1 | Medium | Security | `src/analytics.ts` |
+| ID | Priority | Category | Status | File |
+|---|---|---|---|---|
+| BUG-1 | High | Bug | Open | `src/utils.ts` |
+| BUG-2 | High | Bug | Resolved | `src/validation.ts` |
+| CLEAN-1 | Low | Clean-up | Resolved | `src/Untitled-1.ts` |
+| CLEAN-2 | Low | Clean-up | Open | `src/logs.ts` |
+| CLEAN-3 | Low | Clean-up | Open | `src/components/App.tsx`, `src/components/EmptyState.tsx` |
+| ARCH-1 | Medium | Architecture | Open | `src/hooks/use-google-search-scrape.ts`, `src/utils.ts` |
+| ARCH-2 | Low | Architecture | Resolved | `src/utils.ts` |
+| ARCH-3 | Low | Architecture | Open | `src/hooks/use-google-search-scrape.ts` |
+| SEC-1 | Medium | Security | Open | `src/analytics.ts` |

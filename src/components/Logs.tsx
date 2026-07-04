@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 import { convertToCsv } from '@src/utils';
 
@@ -66,7 +67,7 @@ function Logs({ logs, progress, isLoading }: Props) {
                   {log?.origin}
                 </a>
               </TableCell>
-              <TableCell className={log?.hasError ? 'text-destructive' : undefined}>
+              <TableCell className={cn(log?.hasError && 'text-destructive')}>
                 {log?.count > 0 && <p>{`finds ${log?.count} links`}</p>}
                 {log?.errorMessage && <span>{log?.errorMessage}</span>}
               </TableCell>

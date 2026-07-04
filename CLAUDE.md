@@ -55,4 +55,6 @@ This is a **Chrome Extension (Manifest V3)** built with React + TypeScript + Web
 
 ### Styling
 
-Uses `styled-components` for component-level styles and `fictoan.min.css` (vendored in `public/`) for utility classes (e.g., `ff-table`, `shape-rounded`, `with-loader`).
+Mid-migration from `styled-components` to Tailwind/shadcn (`src/components/ui/*`); `fictoan.min.css` (vendored in `public/`) still supplies some utility classes (e.g., `shape-rounded`, `with-loader`) used alongside Tailwind. For genuinely new or extracted UI, prefer Tailwind/shadcn over adding new `styled-components` blocks.
+
+For any conditional or merged `className`, always use `cn()` from `src/lib/utils.ts` (clsx + tailwind-merge) — never a template literal or ternary. A pattern like `` `btn ${isLoading && 'with-loader'}` `` leaks the literal string `"false"` into the class list when `isLoading` is falsy; `cn('btn', isLoading && 'with-loader')` avoids that. Apply this rule whenever new code is added or existing code is refactored.
