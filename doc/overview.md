@@ -135,8 +135,7 @@ grab-whatsapp-group-invite-links/
 | Build | Webpack 5 | Bundles three entry points (background, popup, side panel); splits react/vendor chunks |
 | Icons | lucide-react | Deep-imported per-icon (not the barrel export) to avoid bundling the whole icon set |
 | Virtualization | react-virtuoso | Windows the links table so large result sets stay smooth |
-| HTTP | axios + Bottleneck | Fetching pages with rate limiting |
-| Concurrency | p-limit | Additional concurrency cap for bulk extract |
+| HTTP | axios + Bottleneck | Fetching pages with rate limiting and concurrency capping |
 | HTML parsing | cheerio | Extracts links (and group name/icon during validation) from fetched page HTML |
 | CSV | @json2csv/plainjs | Converts link arrays to downloadable CSV |
 | Analytics | GA4 Measurement Protocol | Anonymous event tracking |
@@ -153,7 +152,7 @@ popup opens
     → chrome.scripting.executeScript injects getAllAnchorTags()
     → returns all <a> hrefs from #search
     → user clicks "Extract"
-    → fetchAll() maps each URL through pLimit(50) + Bottleneck
+    → fetchAll() maps each URL through fetchData(), rate-limited by Bottleneck
         → axios.get(url) fetches full HTML
         → cheerio finds all <a href="chat.whatsapp.com/...">
         → inviteLink() validates and normalises each URL

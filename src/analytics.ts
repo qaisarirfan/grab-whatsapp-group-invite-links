@@ -2,8 +2,9 @@ const GA_ENDPOINT = 'https://www.google-analytics.com/mp/collect';
 const GA_DEBUG_ENDPOINT = 'https://www.google-analytics.com/debug/mp/collect';
 
 // Get via https://developers.google.com/analytics/devguides/collection/protocol/ga4/sending-events?client_type=gtag#recommended_parameters_for_reports
-const MEASUREMENT_ID = 'G-9S9H43Y54R'; // Replace with your GA4 Measurement ID
-const API_SECRET = 'g6w2emsLSLuACC3e443xaQ'; // Replace with your GA4 API Secret
+// Injected at build time from .env via webpack.DefinePlugin (see webpack/webpack.common.js)
+const MEASUREMENT_ID = process.env.GA_MEASUREMENT_ID;
+const API_SECRET = process.env.GA_API_SECRET;
 const DEFAULT_ENGAGEMENT_TIME_MSEC = 100;
 
 // Duration of inactivity after which a new session is created

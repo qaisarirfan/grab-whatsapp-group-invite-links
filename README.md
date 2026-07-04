@@ -37,6 +37,12 @@ As a Principal Software Engineer with 12 years of industry experience, I strive 
 ## Setup
 
 ```
+cp .env.example .env
+```
+
+Fill in `GA_MEASUREMENT_ID` and `GA_API_SECRET` in `.env` (see `src/analytics.ts`) — without it, analytics silently no-ops.
+
+```
 npm install
 ```
 

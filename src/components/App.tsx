@@ -42,7 +42,7 @@ function App({ context }: PropTypes) {
     validateAllLinks,
     validationProgress,
   } = useLinkValidation(links, setLinks);
-  const { fetchAll, hasFetchedRef, isLoading, logs } = useGoogleSearchScrape({
+  const { fetchAll, hasFetched, isLoading, logs } = useGoogleSearchScrape({
     autoValidateRef,
     currentURL,
     searchLinks,
@@ -120,15 +120,15 @@ function App({ context }: PropTypes) {
     window.close();
   };
 
-  const showLogsTab = isGoogleSearchPage && hasFetchedRef.current;
-  const showLinksTab = isGoogleSearchPage ? hasFetchedRef.current : links.length > 0;
+  const showLogsTab = isGoogleSearchPage && hasFetched;
+  const showLinksTab = isGoogleSearchPage ? hasFetched : links.length > 0;
   const tabs = [
     ...(showLogsTab ? [{ name: 'Logs', key: 'logs' }] : []),
     ...(showLinksTab ? [{ name: 'Links', key: 'links' }] : []),
     { name: 'Help & FAQs', key: 'help' },
   ];
   const showFallback = currentTab !== 'help' && !(currentTab === 'links' && showLinksTab) && !(currentTab === 'logs' && showLogsTab);
-  const showCenteredLayout = !hasFetchedRef.current && (links.length === 0 || logs.length === 0);
+  const showCenteredLayout = !hasFetched && (links.length === 0 || logs.length === 0);
 
   return (
     <div
@@ -175,7 +175,7 @@ function App({ context }: PropTypes) {
         <EmptyState
           isGoogleSearchPage={isGoogleSearchPage}
           searchLinksCount={searchLinks.length}
-          otherLinksCount={otherLinks.length}
+          otherLinks={otherLinks}
           isLoading={isLoading}
           showExtractAgain={logs.length > 0 && links.length === 0}
           onExtractClick={() => {

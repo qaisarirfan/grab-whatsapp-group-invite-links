@@ -1,4 +1,4 @@
-import { type Dispatch, type MutableRefObject, type SetStateAction, useRef, useState } from 'react';
+import { type Dispatch, type RefObject, type SetStateAction, useState } from 'react';
 
 import { isAxiosError } from 'axios';
 
@@ -15,7 +15,7 @@ type Log = {
 };
 
 interface UseGoogleSearchScrapeArgs {
-  autoValidateRef: MutableRefObject<boolean>;
+  autoValidateRef: RefObject<boolean>;
   currentURL: string | undefined;
   searchLinks: string[];
   setCurrentTab: Dispatch<SetStateAction<string>>;
@@ -31,7 +31,7 @@ export function useGoogleSearchScrape({
   setLinks,
   validateAllLinks,
 }: UseGoogleSearchScrapeArgs) {
-  const hasFetchedRef = useRef(false);
+  const [hasFetched, setHasFetched] = useState(false);
   const [isLoading, setLoading] = useState(false);
   const [logs, setLogs] = useState<Log[]>([]);
 
@@ -88,17 +88,16 @@ export function useGoogleSearchScrape({
 
   const fetchAll = async () => {
     Analytics.fireEvent('fetch_started', { total_targets: searchLinks.length });
-    hasFetchedRef.current = true;
+    setHasFetched(true);
     setCurrentTab('logs');
-    const { default: pLimit } = await import('p-limit');
-    const limit = pLimit(100); // Allow up to 100 concurrent requests
     setLinks([]);
     setLoading(true);
     Analytics.fireEvent('loading_started');
     setLogs([]);
     let store: string[] = [];
 
-    const promises = searchLinks.map((link) => limit(() => getWhatsappLink(link)));
+    // Concurrency is capped by Bottleneck inside fetchData (src/utils.ts), not here.
+    const promises = searchLinks.map((link) => getWhatsappLink(link));
 
     try {
       const res = await Promise.allSettled(promises);
@@ -125,5 +124,5 @@ export function useGoogleSearchScrape({
     }
   };
 
-  return { fetchAll, hasFetchedRef, isLoading, logs };
+  return { fetchAll, hasFetched, isLoading, logs };
 }

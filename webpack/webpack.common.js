@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 const CopyPlugin = require('copy-webpack-plugin');
 const TerserPlugin = require('terser-webpack-plugin');
 const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
@@ -7,6 +8,8 @@ const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
+
+require('dotenv').config();
 
 const srcDir = path.resolve('src');
 
@@ -90,6 +93,10 @@ module.exports = {
   },
   plugins: [
     new CleanWebpackPlugin(), // Cleans the `dist` folder before each build
+    new webpack.DefinePlugin({
+      'process.env.GA_MEASUREMENT_ID': JSON.stringify(process.env.GA_MEASUREMENT_ID),
+      'process.env.GA_API_SECRET': JSON.stringify(process.env.GA_API_SECRET),
+    }),
     new MiniCssExtractPlugin({
       filename: 'css/[name].css',
     }),

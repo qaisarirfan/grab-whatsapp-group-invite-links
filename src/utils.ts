@@ -98,22 +98,25 @@ export const convertToCsv = (data: Record<string, unknown>[], filename: string) 
     csv += chunk.toString();
     return csv;
   };
-  parser.onEnd = () => console.log(csv);
   parser.onError = (err) => console.error(err);
+  parser.onEnd = () => {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `${filename}-${timestamp}.csv`;
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const pom = document.createElement('a');
+    pom.style.visibility = 'hidden';
+    pom.setAttribute('href', url);
+    pom.setAttribute('download', fileName);
+    document.body.appendChild(pom);
+    pom.click();
+    document.body.removeChild(pom);
+    URL.revokeObjectURL(url);
+  };
   data.forEach((record) => parser.write(record));
-
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const fileName = `${filename}-${timestamp}.csv`;
-
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-
-  const pom = document.createElement('a');
-  pom.style.visibility = 'hidden';
-  pom.setAttribute('href', url);
-  pom.setAttribute('download', fileName);
-  pom.click();
-  document.body.removeChild(pom);
+  parser.end();
 };
 
 export default {

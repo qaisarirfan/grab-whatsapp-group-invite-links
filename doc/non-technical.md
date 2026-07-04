@@ -29,7 +29,7 @@ A new browser tab opens automatically the first time you install the extension, 
 1. Navigate to any webpage that may contain WhatsApp group links.
 2. Click the extension icon in the Chrome toolbar.
 3. If WhatsApp invite links exist on that page, a deduplicated list is shown immediately — no button click needed.
-4. If no links are found, a message tells you so (and how many other links were found on the page instead — though those other links aren't listed, since they aren't WhatsApp links).
+4. If no links are found, a message tells you so, and how many other links were found on the page instead. Click **Show other links** to expand the list and see them — click again (now labelled **Hide other links**) to collapse it.
 
 ### On Google Search
 
@@ -138,7 +138,7 @@ You can download the full log as its own CSV file from this tab, separate from t
 ## Frequently Asked Questions
 
 **Why does it say there's no WhatsApp group link on this page?**
-The page you're on doesn't contain any `chat.whatsapp.com` links. If other links were found, the message tells you how many, but they aren't listed since they aren't WhatsApp links.
+The page you're on doesn't contain any `chat.whatsapp.com` links. If other links were found, the message tells you how many — click **Show other links** underneath to expand and view them.
 
 **I clicked Extract but got an empty list — what do I do?**
 None of the Google search results contained a WhatsApp link. Because the list is empty, the **Extract again** button won't appear (it only shows once at least one link has been found). Close the popup and reopen it to start over, or try a more specific search.

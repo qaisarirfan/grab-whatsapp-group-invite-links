@@ -32,7 +32,7 @@ Use this skill:
 - after changes to `src/background.ts` (install/update/uninstall behavior) or `public/manifest.json` (a new permission)
 - as a **periodic coverage audit**, even with no specific change in mind, to catch behavior that shipped without a doc update
 
-Skip only for internal-only refactors with no user-visible effect (e.g. the `ARCH-1`/`ARCH-2`/`ARCH-3` items in `plan/improvements.md`), webpack/build config changes, `src/analytics.ts` internals that add no new user-visible behavior, dead files (`src/Untitled-1.ts`, `src/logs.ts` — both unused, see `plan/improvements.md`), formatting-only changes, or tests (this project has none — `npm test` fails by design per `CLAUDE.md`).
+Skip only for internal-only refactors with no user-visible effect (e.g. concurrency/rate-limiting internals in `src/utils.ts`/`src/hooks/use-google-search-scrape.ts`, or a ref-to-state swap that doesn't change rendered behavior), webpack/build config changes, `src/analytics.ts` internals that add no new user-visible behavior, dead/unused files, formatting-only changes, or tests (this project has none — `npm test` fails by design per `CLAUDE.md`).
 
 ## How Help Renders (the data model you must map onto)
 
@@ -163,7 +163,7 @@ On every run, treat discovery as the primary job:
 2. Diff against `doc/non-technical.md`'s sections to detect undocumented behavior.
 3. Generate the missing walkthrough steps, table rows, and FAQ entries.
 4. Update existing entries when behavior changed (e.g. a `LinkStatus` gains a new value, a button's label changes).
-5. Prevent stale content: if a row or FAQ entry describes removed or changed behavior, fix or delete it. Confirm known dead code (`src/Untitled-1.ts`, `src/logs.ts`) stays undocumented — it was never user-facing.
+5. Prevent stale content: if a row or FAQ entry describes removed or changed behavior, fix or delete it. Confirm any known dead code stays undocumented — it was never user-facing.
 
 ## Pressure Checks
 
@@ -171,7 +171,7 @@ Before finalizing, test the draft against these scenarios:
 
 - A new link type ships (community/channel links from `plan/feature-community-channel-links.md` actually land in `src/utils.ts`): it needs a badge/table update, a usage-walkthrough update, and an FAQ entry if it changes what the user sees.
 - Group name/icon-after-validation already shipped (`src/validation.ts`'s `name`/`iconUrl` fields, rendered in `Links.tsx`): this is a good candidate for a coverage audit right now — check whether `## Link status badges`, the usage walkthrough, and the privacy note already mention that validation now scrapes and displays the group's name and photo, since that's a new data flow worth calling out if it isn't there yet.
-- `ARCH-3` from `plan/improvements.md` ships (the `ref.current` flag is replaced by a derived `logs.length > 0` check): the *behavior* shouldn't change, so the doc shouldn't need edits — but re-run discovery to confirm the render branches still match what's documented.
+- A `ref.current` flag gating tab visibility is replaced by reactive state (no behavior change intended): the doc shouldn't need edits — but re-run discovery to confirm the render branches still match what's documented.
 - A new permission is added to `public/manifest.json` (e.g. `notifications`): explain why in the privacy note before it ships confusion.
 - The onboarding tab URL in `src/background.ts` changes: note in the coverage report that the destination itself is out of this repo's scope, but confirm `doc/non-technical.md` doesn't describe a stale install flow.
 - A new `LinkStatus` value is added (e.g. `'unreachable'`): it needs a badge-table row and, if the meaning isn't obvious, an FAQ entry.
@@ -186,7 +186,7 @@ Before finalizing, test the draft against these scenarios:
 | Inventing an i18n/localization pass | This project has no i18n — don't add one. |
 | Inventing in-app Help screens | This project has no in-app Help renderer — all content lives in `doc/non-technical.md`. |
 | One FAQ per cosmetic detail | Cover trivial details under the parent action/state; reserve FAQs for real user questions. |
-| Copying `plan/improvements.md` bug descriptions into the FAQ | Those are internal bug fixes, not user-facing behavior — skip unless the bug is currently user-visible. |
+| Copying internal `plan/*.md` bug descriptions into the FAQ | Those are internal bug fixes, not user-facing behavior — skip unless the bug is currently user-visible. |
 | Leaving the privacy note stale | Re-check it against `src/analytics.ts` and `src/utils.ts`'s `fetchData` every time host behavior changes. |
 | Assuming an `update-docs`/i18n/translation skill exists in this repo | It doesn't — this skill owns `doc/` end to end. Check `.claude/skills/` if unsure what else is installed. |
 

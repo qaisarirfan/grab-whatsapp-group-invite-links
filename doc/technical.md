@@ -193,8 +193,8 @@ Owns the "validate all" flow and the auto-validate setting.
 Owns the Google Search bulk-extract flow.
 
 - `getWhatsappLink(url)` — fetches `url` via `fetchData`, extracts links with `extractWhatsappLinks`, logs the result (`Log` entry with origin/href/count/error), and **also** fires off `validateLinkWithStorage(link)` for each newly-found link immediately (fire-and-forget) so status badges can start filling in before the whole scrape finishes.
-- `fetchAll()` — switches to the Logs tab, sets `hasFetchedRef.current = true`, dynamically imports `p-limit` and creates a `pLimit(100)` limiter, maps `searchLinks` through it, awaits `Promise.allSettled`, dedupes into `links`, and — if `autoValidateRef.current` is on — kicks off `validateAllLinks(uniqueLinks)` once extraction completes. Switches back to the Links tab in a `finally` block.
-- `hasFetchedRef` — a ref (not reactive state) recording whether an extraction has ever been triggered in this popup session; used to decide whether the Logs/Links tabs should be offered at all, since `logs` is intentionally reset to `[]` at the start of every `fetchAll()` run and can't distinguish "never fetched" from "mid-fetch."
+- `fetchAll()` — switches to the Logs tab, calls `setHasFetched(true)`, maps `searchLinks` through `getWhatsappLink` (concurrency capped by `fetchData`'s `Bottleneck` limiter, not here), awaits `Promise.allSettled`, dedupes into `links`, and — if `autoValidateRef.current` is on — kicks off `validateAllLinks(uniqueLinks)` once extraction completes. Switches back to the Links tab in a `finally` block.
+- `hasFetched` — reactive state recording whether an extraction has ever been triggered in this popup session; used to decide whether the Logs/Links tabs should be offered at all, since `logs` is intentionally reset to `[]` at the start of every `fetchAll()` run and can't distinguish "never fetched" from "mid-fetch."
 
 ### `useCachedValidations(links)` — `src/hooks/use-cached-validations.ts`
 
@@ -224,7 +224,7 @@ Shared root component rendered by both `src/popup/index.tsx` (`context="popup"`)
 | `currentURL` | `string \| undefined` | URL of the active tab |
 | `googleSearchLinks` | `string[]` | All `<a>` hrefs scraped from the Google search DOM |
 | `links` | `string[]` | Final deduplicated WhatsApp invite links |
-| `otherLinks` | `string[]` | Non-WhatsApp links found on a non-Google page (count only; not rendered — see `plan/improvements.md` CLEAN-3) |
+| `otherLinks` | `string[]` | Non-WhatsApp links found on a non-Google page; shown in a collapsible list in `EmptyState.tsx` (`http`/`https` entries are clickable, other schemes render as plain text) |
 | `currentTab` | `'links' \| 'logs' \| 'help'` | Active tab |
 | `currentWindowIdRef` | `MutableRefObject<number \| undefined>` | Window ID captured on mount, used by `openInSidePanel` |
 
@@ -264,9 +264,9 @@ Displays the logo, extension name, and a "Buy Me a Coffee" link. Shown on the in
 
 ### `EmptyState`
 
-Props: `isGoogleSearchPage`, `searchLinksCount`, `otherLinksCount`, `isLoading`, `showExtractAgain`, `onExtractClick`.
+Props: `isGoogleSearchPage`, `searchLinksCount`, `otherLinks`, `isLoading`, `showExtractAgain`, `onExtractClick`.
 
-Renders the initial/fallback screen shown by `App.tsx` whenever no tab (links/logs/help) is active for the current state: `<Header>`, plus either the "no WhatsApp group link on this page" message (direct-page mode, mentioning `otherLinksCount` if non-zero) or the Google Search "Extract"/"Extract again" button and result count (Google Search mode). `onExtractClick` is wired by `App.tsx` to fire the `extract_clicked` analytics event before calling `fetchAll()`.
+Renders the initial/fallback screen shown by `App.tsx` whenever no tab (links/logs/help) is active for the current state: `<Header>`, plus either the "no WhatsApp group link on this page" message (direct-page mode, with a collapsible list of `otherLinks` if non-empty — `http`/`https` entries render as clickable links, other schemes render as plain text) or the Google Search "Extract"/"Extract again" button and result count (Google Search mode). `onExtractClick` is wired by `App.tsx` to fire the `extract_clicked` analytics event before calling `fetchAll()`.
 
 ### `Links`
 
@@ -333,7 +333,7 @@ No props. Always-available tab (`currentTab === 'help'`) covering: a short how-t
 
 ### `Tabs`
 
-Generic tab selector (wraps shadcn `Tabs`/`TabsList`/`TabsTrigger`). Renders tab buttons and calls `onTabSelected` with the chosen key. `App.tsx` builds the tab list dynamically: Logs and Links tabs only appear once relevant (`hasFetchedRef.current` in Google Search mode, `links.length > 0` otherwise); "Help & FAQs" is always present.
+Generic tab selector (wraps shadcn `Tabs`/`TabsList`/`TabsTrigger`). Renders tab buttons and calls `onTabSelected` with the chosen key. `App.tsx` builds the tab list dynamically: Logs and Links tabs only appear once relevant (`hasFetched` in Google Search mode, `links.length > 0` otherwise); "Help & FAQs" is always present.
 
 ### `ui/` (shadcn / base-ui component library)
 
@@ -380,8 +380,7 @@ Load the unpacked extension from `dist/` in `chrome://extensions/` with Develope
 | `react-virtuoso` | Virtualizes the links table (`TableVirtuoso`) |
 | `axios` | HTTP fetching in Google Search mode and link validation |
 | `axios-retry` | Exponential backoff on 429/network errors during validation |
-| `bottleneck` | Rate limiting for both fetch (`utils.ts`) and validation (`validation.ts`) |
-| `p-limit` | Additional concurrency cap (100) for `fetchAll`, dynamically imported |
+| `bottleneck` | Sole concurrency/rate limiter for both fetch (`utils.ts`) and validation (`validation.ts`) |
 | `cheerio` | Server-side HTML parsing to extract links, and to read group name/icon during validation |
 | `@json2csv/plainjs` | CSV serialisation |
 
