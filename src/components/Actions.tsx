@@ -6,15 +6,17 @@ import { useEffect, useState } from 'react';
 import Loader2Icon from 'lucide-react/dist/esm/icons/loader-2.mjs';
 
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 
 import Analytics from '@src/analytics';
 import { convertToCsv, copyToClipboard } from '@src/utils';
-import type { LinkValidation } from '@src/validation';
+import type { LinkValidation, StatusFilter } from '@src/validation';
 import { getStatusLabel } from '@src/validation';
 
 import ExportMenu, { type ExportScope } from './ExportMenu';
+import FilterMenu from './FilterMenu';
 import ValidationProgress from './ValidationProgress';
 
 interface PropTypes {
@@ -24,12 +26,19 @@ interface PropTypes {
   visibleLinks: string[];
   onFetch: VoidFunction;
   onValidateAll?: VoidFunction;
+  onCancelValidation?: VoidFunction;
+  onRetryValidation?: VoidFunction;
   isValidating?: boolean;
   validationProgress?: { done: number; total: number };
   inFlightLinks?: string[];
   validations?: Record<string, LinkValidation>;
   autoValidate?: boolean;
   onToggleAutoValidate?: (value: boolean) => void;
+  statusFilter: StatusFilter;
+  onStatusFilterChange: (key: StatusFilter) => void;
+  statusCounts: Record<StatusFilter, number>;
+  hideDuplicates: boolean;
+  onToggleHideDuplicates: VoidFunction;
 }
 
 function Actions({
@@ -39,14 +48,22 @@ function Actions({
   visibleLinks,
   onFetch,
   onValidateAll,
+  onCancelValidation,
+  onRetryValidation,
   isValidating,
   validationProgress,
   inFlightLinks,
   validations,
   autoValidate,
   onToggleAutoValidate,
+  statusFilter,
+  onStatusFilterChange,
+  statusCounts,
+  hideDuplicates,
+  onToggleHideDuplicates,
 }: PropTypes) {
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [exportScope, setExportScope] = useState<ExportScope>('shown');
   const [hasCopyAsJSON, setHasCopyAsJSON] = useState(false);
   const [isCopyAsJSON, setIsCopyAsJSON] = useState(false);
@@ -180,6 +197,17 @@ function Actions({
           </Label>
         )}
         {links.length > 0 && (
+          <FilterMenu
+            hideDuplicates={hideDuplicates}
+            isOpen={isFilterOpen}
+            onOpenChange={setIsFilterOpen}
+            onStatusFilterChange={onStatusFilterChange}
+            onToggleHideDuplicates={onToggleHideDuplicates}
+            statusCounts={statusCounts}
+            statusFilter={statusFilter}
+          />
+        )}
+        {links.length > 0 && (
           <ExportMenu
             exportScope={exportScope}
             hasCopyAsJSON={hasCopyAsJSON}
@@ -196,9 +224,25 @@ function Actions({
           />
         )}
       </div>
-      {isValidating && (
-        <ValidationProgress fallbackTotal={links.length} inFlightLinks={inFlightLinks} validationProgress={validationProgress} />
-      )}
+      {/* `open` is fully controlled by isValidating with a no-op onOpenChange, so neither
+          Escape nor an outside press can close it early — disablePointerDismissal just
+          suppresses the outside-press animation/focus attempt on top of that. It only
+          closes once validation actually finishes. */}
+      <Dialog open={!!isValidating} onOpenChange={() => {}} disablePointerDismissal>
+        <DialogContent showCloseButton={false} className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Validating links</DialogTitle>
+            <DialogDescription>This closes automatically once every link has been checked.</DialogDescription>
+          </DialogHeader>
+          <ValidationProgress
+            fallbackTotal={links.length}
+            inFlightLinks={inFlightLinks}
+            validationProgress={validationProgress}
+            onCancel={onCancelValidation}
+            onRetry={onRetryValidation}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

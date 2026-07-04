@@ -70,6 +70,11 @@ export const validateLink = async (link: string): Promise<Omit<LinkValidation, '
   }
 };
 
+// Tracks links currently being validated so an overlapping call (e.g. Retry re-targeting a link
+// that's still in flight from the run it's retrying) reuses the same request instead of doubling
+// traffic to WhatsApp's servers.
+const inFlightValidations = new Map<string, Promise<LinkValidation>>();
+
 export const validateLinkWithStorage = async (link: string, onStart?: () => void): Promise<LinkValidation> => {
   // Check cache first, outside the rate limiter — a cache hit needs no network call and
   // shouldn't wait behind the validationLimiter's queue.
@@ -87,27 +92,39 @@ export const validateLinkWithStorage = async (link: string, onStart?: () => void
     return cached;
   }
 
-  return validationLimiter.schedule(async () => {
-    // Only fires once the rate limiter actually admits this job, not when it's merely queued
-    onStart?.();
+  const inFlight = inFlightValidations.get(link);
+  if (inFlight) {
+    return inFlight;
+  }
 
-    // Validate
-    const result = await validateLink(link);
-    const validation: LinkValidation = {
-      link,
-      lastValidated: Date.now(),
-      cacheVersion: CACHE_VERSION,
-      ...result,
-    };
+  const validation = validationLimiter
+    .schedule(async () => {
+      // Only fires once the rate limiter actually admits this job, not when it's merely queued
+      onStart?.();
 
-    // Store result — re-read storage here since it may have changed while this job was queued
-    const latestStorage = (await chrome.storage.local.get('validations')) as StorageData;
-    const allValidations = latestStorage.validations || {};
-    allValidations[link] = validation;
-    await chrome.storage.local.set({ validations: allValidations });
+      // Validate
+      const result = await validateLink(link);
+      const newValidation: LinkValidation = {
+        link,
+        lastValidated: Date.now(),
+        cacheVersion: CACHE_VERSION,
+        ...result,
+      };
 
-    return validation;
-  });
+      // Store result — re-read storage here since it may have changed while this job was queued
+      const latestStorage = (await chrome.storage.local.get('validations')) as StorageData;
+      const allValidations = latestStorage.validations || {};
+      allValidations[link] = newValidation;
+      await chrome.storage.local.set({ validations: allValidations });
+
+      return newValidation;
+    })
+    .finally(() => {
+      inFlightValidations.delete(link);
+    });
+
+  inFlightValidations.set(link, validation);
+  return validation;
 };
 
 export const validateMultipleLinks = async (links: string[]): Promise<LinkValidation[]> => {

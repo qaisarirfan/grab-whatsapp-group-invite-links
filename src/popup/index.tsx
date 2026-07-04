@@ -11,7 +11,7 @@ if (container) {
   const root = createRoot(container);
   root.render(
     <React.StrictMode>
-      <App context="popup" />
+      <App />
     </React.StrictMode>
   );
 }

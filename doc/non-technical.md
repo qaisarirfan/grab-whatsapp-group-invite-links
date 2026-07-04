@@ -7,8 +7,6 @@ This Chrome extension helps you find WhatsApp group invite links. Everything hap
 1. **On any regular webpage** — it scans the page you are on and instantly shows any WhatsApp group invite links already present on that page.
 2. **On Google Search results** — it visits each search result link on your behalf, scrapes its content, and collects any WhatsApp group invite links hidden inside those pages.
 
-You can use the extension two ways: as a **popup** (click the toolbar icon, it closes when you click elsewhere) or as a **side panel** (stays open next to the page while you browse). Both show the exact same features — pick whichever fits how you work.
-
 ---
 
 ## How to install
@@ -40,28 +38,31 @@ A new browser tab opens automatically the first time you install the extension, 
 5. When extraction finishes, you're switched back to the **Links** tab automatically, showing the deduplicated results.
 6. If no WhatsApp links were found anywhere, the Links tab will look empty — see the FAQ below for what to do next.
 
+### Tips for searching Google
+
+**Extract** only reads the search results already on the page you're viewing, so a well-aimed Google search matters more than the extension itself:
+
+- **Add `site:chat.whatsapp.com`** to your search to bias results toward pages that link to WhatsApp invites, e.g. `site:chat.whatsapp.com photography`.
+- **Add a topic keyword** alongside it to narrow things down, e.g. `site:chat.whatsapp.com crypto trading` or `site:chat.whatsapp.com "football fans"`.
+- **Use quotes for an exact phrase**, e.g. `"whatsapp group link" recipes`, to match pages that use that exact wording.
+- **Exclude unwanted results with a minus sign**, e.g. `site:chat.whatsapp.com marketing -job`, to drop results mentioning "job."
+- **Go past page 1.** Since Extract only sees the current results page, click Google's page 2, 3, etc. (or "More results") and reopen the popup to run Extract again on each one — this is how you collect more than one page's worth of links.
+
+There's no single query that works for every topic — mix and match these based on what you're looking for.
+
 ### Auto-validate
 
 There's an **Auto-validate** switch in the action bar. When it's on, every link gets checked automatically the moment it's found — you don't need to click **Validate links** yourself. This setting is remembered between popup opens. It's off by default, since validating hundreds of links automatically takes a while and makes requests to WhatsApp's servers for each one.
 
 ### Filtering and de-duplicating the list
 
-Once at least one link has been found, a row of filter buttons appears above the table — **All**, **Active**, **Expired**, **Invalid**, **Rate-limited**, **Pending** — each showing how many links currently have that status. Click one to show only links in that state; click **All** to go back to seeing everything.
+Once at least one link has been found, a **Filter** button appears above the table. Opening it shows a status list — **All**, **Active**, **Expired**, **Invalid**, **Rate-limited**, **Pending** — each with a count of how many links currently have that status. Pick one to show only links in that state; pick **All** to go back to seeing everything.
 
-A **Hide duplicates** button next to the filters collapses multiple invite links that all point to the same group (recognised by the group name once validated) down to a single entry, so you don't have to look through repeats of the same group found on different pages.
+The same Filter menu also has a **Hide duplicates** option that collapses multiple invite links pointing to the same group (recognised by the group name once validated) down to a single entry, so you don't have to look through repeats of the same group found on different pages.
 
 ### Help & FAQs, right in the popup
 
 A **Help & FAQs** tab is always available in the popup, on every page and in every mode — you don't need to leave the extension or come back to this guide. It has a short how-to-use recap, the same badge legend as below, and an expandable FAQ list covering the same questions as the section further down this page.
-
-### Using the side panel instead of the popup
-
-If you'd rather keep the extension open while you browse (instead of it closing every time you click elsewhere), open it in Chrome's side panel:
-
-- Click the **Open in side panel** button next to the tabs at the top of the popup, or
-- Right-click the extension's toolbar icon (or right-click anywhere on the page) and choose **Open in side panel** from the menu.
-
-The side panel shows the exact same tabs, buttons, and badges as the popup — it just stays docked next to the page instead of closing automatically, and it resizes to however wide you drag it.
 
 ---
 
@@ -69,11 +70,10 @@ The side panel shows the exact same tabs, buttons, and badges as the popup — i
 
 | Button | Where it appears | What it does |
 |---|---|---|
-| **Open in side panel** | Next to the tabs, popup only | Moves the extension into Chrome's side panel, so it stays open next to the page instead of closing when you click away |
 | **Extract** | Before the first extraction (Google Search only) | Starts scraping all Google search results for WhatsApp links |
 | **Extract again** | Action bar, once at least one link has been found (Google Search only) | Re-runs the extraction from scratch |
 | **Validate links** / **Re-validate links** | Action bar, once at least one link has been found | Checks each found link to see if it's still active or expired |
-| **Auto-validate** | Action bar switch, once at least one link has been found | When on, links are validated automatically as they're found, without needing to click Validate links |
+| **Auto-validate** | Action bar switch, always visible once the Links tab is showing | When on, links are validated automatically as they're found, without needing to click Validate links |
 | **Export** | Action bar, once at least one link has been found | Opens a menu with **Copy as Text**, **Copy as JSON**, and **Download CSV**, plus a choice of scope — see below |
 | **Download csv** (Logs tab) | Logs tab (Google Search only) | Downloads a separate `.csv` file of the scrape log — one row per page visited |
 
@@ -86,7 +86,7 @@ Clicking **Export** opens a small menu with two parts:
 
 Since Copy and Download always follow the current filter/dedupe settings, if you only want expired links exported, filter to **Expired** first, then use Export.
 
-The Export menu stays visible even when the list is empty (this can happen in Google Search mode if nothing is found). **Validate links**, **Auto-validate**, **Extract again**, and the total link count only appear once at least one link has been found.
+The **Auto-validate** switch stays visible even when the list is empty (this can happen in Google Search mode if nothing is found), so you can turn it on ahead of the next extraction. **Validate links**, **Extract again**, the total link count, and the **Export** menu only appear once at least one link has been found.
 
 The popup header also shows an optional "Support me on Buy Me a Coffee" link if you'd like to support the developer — this is entirely optional and unrelated to the extension's function.
 
@@ -102,7 +102,7 @@ After clicking **Validate links**, each link gets a coloured badge:
 | Expired | Red | The invite is no longer active — either WhatsApp reported it as gone, or the page loaded without showing a group name (usually because the invite was revoked or fully used) |
 | Invalid | Yellow | The check failed in an unexpected way, such as a network problem (rare) |
 | Rate-limited | Grey | The check took longer than 8 seconds without a response, or WhatsApp temporarily rate-limited the request. Try validating again later |
-| Checking... | Grey | Validation is in progress |
+| *(no badge yet)* | — | The link hasn't been checked yet — nothing shows until you click **Validate links** (or Auto-validate runs). Pick **Pending** in the Filter menu above the table to see how many are left |
 
 Each validated link also shows a "Last checked" date, and — when the extension could read it — the group's name and photo above the raw link, instead of just a bare URL. Validation results are cached for **24 hours** per link (except Rate-limited results, which always retry on the next check rather than being reused), so re-checking the same link within a day usually reuses the previous result instead of making a new request.
 
@@ -131,7 +131,6 @@ You can download the full log as its own CSV file from this tab, separate from t
 - **Local storage**: Validation results (cached for 24 hours) and an anonymous usage ID are stored only inside your own browser, using Chrome's storage permission — never uploaded anywhere except as anonymous analytics, below.
 - **Analytics**: Every time you open the popup, the web address and title of whichever page you're currently on are sent to Google Analytics, along with anonymous usage events (such as which buttons you click and how many links were found). This is used only to understand how the extension is used. It isn't tied to your name or Google account, and it never includes passwords, form content, or the WhatsApp links you find.
 - The extension does not sell your data, and there is no separate server run by the developer that stores what you browse.
-- **Side panel**: Opening the side panel (via the button or right-click menu) doesn't read or send anything extra — it's the same extension shown in a different part of the browser window.
 
 ---
 
@@ -142,6 +141,9 @@ The page you're on doesn't contain any `chat.whatsapp.com` links. If other links
 
 **I clicked Extract but got an empty list — what do I do?**
 None of the Google search results contained a WhatsApp link. Because the list is empty, the **Extract again** button won't appear (it only shows once at least one link has been found). Close the popup and reopen it to start over, or try a more specific search.
+
+**What should I search for on Google to find more WhatsApp groups?**
+Start with `site:chat.whatsapp.com` plus a topic keyword (e.g. `site:chat.whatsapp.com yoga`), or an exact phrase like `"whatsapp group link"` alongside your topic. See **Tips for searching Google** above for more examples. Since Extract only reads the current results page, page through Google's results (page 2, 3, …) and extract again on each page for more links.
 
 **Why does a search result show an error in red in the Logs tab?**
 That specific page couldn't be reached or scraped (for example, it was down or blocked the request). Extraction automatically skips it and continues with the rest — no action needed on your part.
@@ -169,9 +171,6 @@ Yes. **Extract again** re-runs the scrape from scratch (Google Search mode, once
 
 **A new tab opened when I installed or updated the extension — is that normal?**
 Yes. It opens automatically on install and on update to show more information about the extension. You can close it at any time.
-
-**What's the difference between the popup and the side panel?**
-They're the same extension with the same tabs, buttons, and badges. The popup closes as soon as you click elsewhere; the side panel stays docked next to the page until you close it, which is handy if you're checking links while browsing multiple pages. Use whichever fits how you work — nothing about link extraction or validation changes between them.
 
 **What happens when I remove the extension?**
 Chrome opens a short feedback page. This is optional — you can close it without filling anything in.

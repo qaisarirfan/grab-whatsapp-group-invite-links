@@ -4,6 +4,9 @@ import type { LinkValidation, StorageData } from '@src/validation';
 
 export function useCachedValidations(links: string[]) {
   const [validations, setValidations] = useState<Record<string, LinkValidation>>({});
+  // Only gates the very first read — later effect runs (e.g. the new-array-reference trick
+  // validate-all uses to push live progress) refresh validations silently, without flashing back to loading.
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadValidations = async () => {
@@ -16,9 +19,10 @@ export function useCachedValidations(links: string[]) {
         }
       });
       setValidations(newValidations);
+      setIsLoading(false);
     };
     loadValidations();
   }, [links]);
 
-  return validations;
+  return { isLoading, validations };
 }

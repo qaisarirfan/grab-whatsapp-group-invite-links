@@ -68,7 +68,6 @@ When on `google.com/search`, the extension collects all result URLs and lets you
 | Validation caching | Results cached for 24 hours in `chrome.storage.local` (bypassed for rate-limited results, which always retry) |
 | Help & FAQs tab | Always-available in-popup how-to and FAQ list, no need to leave the extension |
 | Analytics | Anonymous GA4 usage tracking (Measurement Protocol) |
-| Side panel mode | The same app can run in Chrome's side panel (persists alongside the page) instead of the popup, opened via a button or right-click menu |
 
 ---
 
@@ -93,13 +92,10 @@ grab-whatsapp-group-invite-links/
 │   ├── styles/
 │   │   └── globals.css        # Tailwind v4 + shadcn theme tokens, light/dark via `.dark` class
 │   ├── popup/
-│   │   ├── index.tsx          # Mounts <App context="popup" />
+│   │   ├── index.tsx          # Mounts <App />
 │   │   └── index.html         # Popup HTML shell
-│   ├── sidepanel/
-│   │   ├── index.tsx          # Mounts <App context="sidepanel" />
-│   │   └── index.html         # Side panel HTML shell
 │   └── components/
-│       ├── App.tsx            # Shared root — owns top-level state, wires the hooks above for both popup and side panel
+│       ├── App.tsx            # Shared root — owns top-level state, wires the hooks above
 │       ├── Header.tsx         # Logo + Buy Me a Coffee
 │       ├── EmptyState.tsx     # Initial/fallback screen (no-links message or Extract button)
 │       ├── Links.tsx          # Virtualized links table (react-virtuoso) + filter bar
@@ -132,7 +128,7 @@ grab-whatsapp-group-invite-links/
 |---|---|---|
 | UI | React 19 + Tailwind CSS v4 + shadcn/base-ui | Popup interface (fully migrated off styled-components) |
 | Language | TypeScript 5 | Type safety across all modules |
-| Build | Webpack 5 | Bundles three entry points (background, popup, side panel); splits react/vendor chunks |
+| Build | Webpack 5 | Bundles two entry points (background, popup); splits react/vendor chunks |
 | Icons | lucide-react | Deep-imported per-icon (not the barrel export) to avoid bundling the whole icon set |
 | Virtualization | react-virtuoso | Windows the links table so large result sets stay smooth |
 | HTTP | axios + Bottleneck | Fetching pages with rate limiting and concurrency capping |
@@ -187,8 +183,6 @@ During Google Search scraping, each link is also individually queued for validat
 | `activeTab` | Read the URL and title of the currently open tab |
 | `scripting` | Inject the anchor-tag collector into the active tab's DOM |
 | `storage` | Cache validation results and persist analytics IDs |
-| `sidePanel` | Let the extension's UI run in Chrome's side panel as an alternative to the popup |
-| `contextMenus` | Add the right-click "Open in side panel" menu item |
 | `https://*/*` `http://*/*` | Fetch arbitrary pages during bulk Google Search extraction |
 
 ---
@@ -220,7 +214,6 @@ There is no test suite defined; `npm test` will fail.
 | Plan | Document |
 |---|---|
 | Community & channel link extraction | [plan/feature-community-channel-links.md](../plan/feature-community-channel-links.md) |
-| Bug fixes and code quality improvements | [plan/improvements.md](../plan/improvements.md) |
 
 ---
 

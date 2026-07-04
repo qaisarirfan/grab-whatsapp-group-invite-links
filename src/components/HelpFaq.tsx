@@ -21,6 +21,11 @@ const FAQS: { question: string; answer: string }[] = [
       'None of the Google search results contained a WhatsApp link. Close the popup and reopen it to start over, or try a more specific search.',
   },
   {
+    question: 'What should I search for on Google to find more WhatsApp groups?',
+    answer:
+      'Try adding "site:chat.whatsapp.com" plus a topic keyword to your Google search, such as "site:chat.whatsapp.com yoga". Since Extract only reads the current results page, page through Google\'s results and click Extract again on each page for more links.',
+  },
+  {
     question: 'Why does a search result show an error in red in the Logs tab?',
     answer: 'That page could not be reached or scraped. Extraction automatically skips it and continues with the rest.',
   },
@@ -44,6 +49,16 @@ const FAQS: { question: string; answer: string }[] = [
       'If your browser blocks clipboard access, the button quietly returns to normal. Try again, check clipboard permissions, or use Download CSV instead.',
   },
   {
+    question: 'What is the difference between the Shown and Valid only export scopes?',
+    answer:
+      'Shown exports whatever the current status filter and Hide duplicates toggle are currently displaying. Valid only narrows that further to just the links marked Active.',
+  },
+  {
+    question: 'Should I turn on Auto-validate?',
+    answer:
+      'It is handy if you always want to know link status without an extra click, but every found link gets checked immediately, which takes longer for large result sets. It is off by default, turn it on if you would rather not remember to click Validate links yourself.',
+  },
+  {
     question: 'Can I redo an extraction or re-check links?',
     answer:
       'Yes. Extract again re-runs the scrape from scratch, and Validate links can be clicked any time, though results within 24 hours reuse the cached result.',
@@ -53,9 +68,8 @@ const FAQS: { question: string; answer: string }[] = [
     answer: 'Yes. It opens automatically on install and update to show more information about the extension. You can close it anytime.',
   },
   {
-    question: 'What is the difference between the popup and the side panel?',
-    answer:
-      'They are the same extension with the same tabs, buttons, and badges. The popup closes as soon as you click elsewhere; the side panel stays open next to the page until you close it.',
+    question: 'What happens when I remove the extension?',
+    answer: 'Chrome opens a short feedback page. This is optional, you can close it without filling anything in.',
   },
   {
     question: 'Does this extension track what websites I visit?',
@@ -74,7 +88,7 @@ function HelpFaq() {
   };
 
   return (
-    <div className="flex max-h-[calc(100vh-140px)] flex-col gap-5 overflow-y-auto px-1 py-3">
+    <div className="flex flex-col gap-5 px-1 py-3">
       <section>
         <h3 className="mb-2 text-sm font-semibold">How to use</h3>
         <ul className="list-disc space-y-1.5 pl-5 text-sm">
@@ -87,10 +101,6 @@ function HelpFaq() {
           </li>
           <li>
             <strong>Validate links:</strong> click Validate links to check whether each found link is still active.
-          </li>
-          <li>
-            <strong>Side panel:</strong> click Open in side panel (next to the tabs) or right-click the toolbar icon or the page to keep the
-            extension open next to the page instead of it closing automatically.
           </li>
         </ul>
       </section>

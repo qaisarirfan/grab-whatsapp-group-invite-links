@@ -1,7 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { useEffect, useMemo, useState } from 'react';
 
 import EmptyState from '@components/EmptyState';
 import HelpFaq from '@components/HelpFaq';
@@ -16,12 +13,7 @@ import { useLinkValidation } from '@src/hooks/use-link-validation';
 import { useSystemTheme } from '@src/hooks/use-system-theme';
 import { getAllAnchorTags, inviteLink, isGoogle } from '@src/utils';
 
-interface PropTypes {
-  context: 'popup' | 'sidepanel';
-}
-
-function App({ context }: PropTypes) {
-  const currentWindowIdRef = useRef<number | undefined>(undefined);
+function App() {
   const [currentURL, setCurrentURL] = useState<string | undefined>();
   const [googleSearchLinks, setGoogleSearchLinks] = useState<string[]>([]);
   const [links, setLinks] = useState<string[]>([]);
@@ -35,9 +27,11 @@ function App({ context }: PropTypes) {
   const {
     autoValidate,
     autoValidateRef,
+    cancelValidation,
     inFlightLinks,
     isValidating,
     loadAutoValidateSetting,
+    retryValidation,
     toggleAutoValidate,
     validateAllLinks,
     validationProgress,
@@ -54,17 +48,16 @@ function App({ context }: PropTypes) {
   useSystemTheme();
 
   useEffect(() => {
-    Analytics.fireEvent('extension_loaded', { context });
+    Analytics.fireEvent('extension_loaded');
 
     const init = async () => {
       await loadAutoValidateSetting();
 
       chrome.tabs.query({ active: true, windowId: chrome.windows.WINDOW_ID_CURRENT }, (tabs) => {
-        const { url, id, title, windowId } = tabs[0];
+        const { url, id, title } = tabs[0];
         Analytics.firePageViewEvent(title ?? '', url ?? '');
 
         if (!id) return;
-        currentWindowIdRef.current = windowId;
         setCurrentURL(url);
         Analytics.fireEvent('page_type_detected', {
           is_google: isGoogle(url),
@@ -108,37 +101,19 @@ function App({ context }: PropTypes) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // chrome.sidePanel.open() must be called synchronously within the click's call stack — an
-  // awaited chrome.tabs.query() beforehand can drop the user-gesture requirement, so the window ID
-  // captured at mount (currentWindowIdRef) is used instead of re-querying here.
-  const openInSidePanel = () => {
-    Analytics.fireEvent('side_panel_opened_from_popup');
-    const windowId = currentWindowIdRef.current;
-    if (windowId !== undefined) {
-      chrome.sidePanel.open({ windowId }).catch(() => {});
-    }
-    window.close();
-  };
-
   const showLogsTab = isGoogleSearchPage && hasFetched;
   const showLinksTab = isGoogleSearchPage ? hasFetched : links.length > 0;
   const tabs = [
+    ...(isGoogleSearchPage || currentTab === 'help' ? [{ name: 'Home', key: 'x' }] : []),
     ...(showLogsTab ? [{ name: 'Logs', key: 'logs' }] : []),
     ...(showLinksTab ? [{ name: 'Links', key: 'links' }] : []),
     { name: 'Help & FAQs', key: 'help' },
   ];
   const showFallback = currentTab !== 'help' && !(currentTab === 'links' && showLinksTab) && !(currentTab === 'logs' && showLogsTab);
-  const showCenteredLayout = !hasFetched && (links.length === 0 || logs.length === 0);
 
   return (
-    <div
-      className={cn(
-        'relative min-h-[calc(100vh-60px)] p-3',
-        context === 'sidepanel' ? 'max-w-none min-w-auto' : 'max-w-162.5 min-w-162.5',
-        showCenteredLayout && 'flex flex-col justify-center'
-      )}
-    >
-      <div className="flex items-center justify-between">
+    <div className="relative h-full max-w-162.5 min-w-162.5 p-3">
+      <div className="flex items-center justify-between border-b">
         <Tab
           tabs={tabs}
           currentSelected={currentTab}
@@ -147,11 +122,6 @@ function App({ context }: PropTypes) {
             setCurrentTab(tab);
           }}
         />
-        {context === 'popup' && (
-          <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={openInSidePanel}>
-            Open in side panel
-          </Button>
-        )}
       </div>
       {currentTab === 'links' && showLinksTab && (
         <Links
@@ -160,6 +130,8 @@ function App({ context }: PropTypes) {
           isLoading={isLoading}
           isGoogleSearch={isGoogleSearchPage}
           onValidateAll={validateAllLinks}
+          onCancelValidation={cancelValidation}
+          onRetryValidation={retryValidation}
           isValidating={isValidating}
           validationProgress={validationProgress}
           inFlightLinks={inFlightLinks}

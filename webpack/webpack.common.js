@@ -17,7 +17,6 @@ module.exports = {
   entry: {
     background: path.join(srcDir, 'background.ts'),
     popup: path.join(srcDir, 'popup/index.tsx'),
-    sidepanel: path.join(srcDir, 'sidepanel/index.tsx'),
   },
   output: {
     path: path.join(__dirname, '../dist'),
@@ -44,7 +43,15 @@ module.exports = {
           mangle: true,
         },
       }),
-      new CssMinimizerPlugin(),
+      new CssMinimizerPlugin({
+        minimizerOptions: {
+          // postcss-calc can't parse CSS relative-color syntax (e.g.
+          // oklch(from var(--x) l calc(c * 0.4) h)) used in ui/bubble.tsx —
+          // it misreads channel keywords like `c`/`l`/`alpha` as invalid
+          // calc tokens. Disable calc reduction to avoid the lexical errors.
+          preset: ['default', { calc: false }],
+        },
+      }),
     ],
     splitChunks: {
       chunks: 'all',
@@ -104,11 +111,6 @@ module.exports = {
       template: path.join(srcDir, 'popup/index.html'), // Popup HTML template
       filename: 'popup.html',
       chunks: ['popup'], // Only include the popup script
-    }),
-    new HtmlWebpackPlugin({
-      template: path.join(srcDir, 'sidepanel/index.html'), // Side panel HTML template
-      filename: 'sidepanel.html',
-      chunks: ['sidepanel'], // Only include the side panel script
     }),
     new CopyPlugin({
       patterns: [{ from: '.', to: '../dist', context: 'public' }],

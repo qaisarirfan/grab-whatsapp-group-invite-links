@@ -15,10 +15,6 @@
     "default_popup": "popup.html"
   },
 
-  "side_panel": {
-    "default_path": "sidepanel.html"
-  },
-
   "icons": {
     "16": "/images/line-16.png",
     "32": "/images/line-32.png",
@@ -31,7 +27,7 @@
     "type": "module"
   },
 
-  "permissions": ["activeTab", "scripting", "storage", "sidePanel", "contextMenus"],
+  "permissions": ["activeTab", "scripting", "storage"],
 
   "host_permissions": ["https://*/*", "http://*/*"]
 }
