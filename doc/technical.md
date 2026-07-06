@@ -122,7 +122,7 @@ Deliberately conservative (up to 10 in-flight requests, roughly 2 new requests l
 | Export | Purpose |
 |---|---|
 | `validateLink(link)` | `axios.get()`s the invite page directly (real `host_permissions`, no CORS workaround needed) with an 8-second `AbortController` timeout. Loads the HTML with `cheerio`: if `#main_block h3` has text, the link is `'valid'` (captures `name` and `iconUrl` from `#main_block img`); if the page loads with no name, it's `'expired'`. `404`/`410` → `'expired'`; `429`/timeout → `'rate-limited'`; anything else → `'invalid'`. |
-| `validateLinkWithStorage(link, onStart?)` | Wraps `validateLink` in `validationLimiter`. Reads cache first (TTL + version check); only fetches if stale. Writes the result back to `chrome.storage.local`. The optional `onStart` callback fires the moment the rate limiter actually admits the job — not when it's merely queued — so callers can track which links are currently in flight. |
+| `validateLinkWithStorage(link, onStart?)` | Wraps `validateLink` in `validationLimiter`. Reads cache first (TTL + version check); only fetches if stale. An in-flight promise map (`inFlightValidations`) dedupes overlapping calls for the same link — e.g. Retry re-targeting a link still in flight from the run it's retrying — so they reuse the same request instead of doubling traffic. Writes the result back to `chrome.storage.local`. The optional `onStart` callback fires the moment the rate limiter actually admits the job — not when it's merely queued — so callers can track which links are currently in flight. |
 | `validateMultipleLinks(links)` | `Promise.all` over `validateLinkWithStorage` for each link, no progress reporting. |
 | `validateMultipleLinksWithProgress(links, onProgress, onStart?)` | Same as above, but calls `onProgress(doneCount, link)` after each link settles and `onStart(link)` when each link's validation actually begins — powers the live progress bar and "currently validating" indicator in the popup. |
 | `getValidationStatus(link)` | Reads `chrome.storage.local` and returns the cached `LinkValidation` or `null`. |
@@ -142,7 +142,7 @@ GA4 Measurement Protocol client. Singleton exported as `default new Analytics()`
 
 - Stores a persistent `clientId` (UUID) in `chrome.storage.local`.
 - Stores session data in `chrome.storage.session` (in-memory only). Sessions expire after 30 minutes of inactivity.
-- `fireEvent(name, params)` — POST to the GA4 endpoint with client/session IDs automatically attached.
+- `fireEvent(name, params)` — POST to the GA4 endpoint with client/session IDs automatically attached. No-ops when `process.env.NODE_ENV !== 'production'` (i.e. `npm run watch` dev builds never report), so `firePageViewEvent`/`fireErrorEvent` are silent no-ops too since they call `fireEvent` internally.
 - `firePageViewEvent(pageTitle, pageLocation, params)` — fires a `page_view` event.
 - `fireErrorEvent(error, params)` — fires an `extension_error` event (avoids reserved name `error`).
 
@@ -161,7 +161,11 @@ Events fired across the app:
 | `extension_error` | Axios errors |
 | `no_links_found` | Zero results |
 | `validate_links_started` / `validate_links_completed` / `validate_links_error` | Validation flow |
+| `validate_links_cancelled` / `validate_links_retried` | Cancel/Retry buttons in the stalled-validation dialog |
 | `validate_all_clicked` | Actions component |
+| `validation_progress_minimized` / `validation_progress_restored` | Chevron/floating-pill buttons that minimize/restore the validation progress dialog |
+| `clear_cache_confirmed` | Confirm button in the Clear cache alert dialog |
+| `validation_cache_cleared` / `clear_cache_error` | `Links.tsx`'s `handleClearCache`, after `clearValidationCache()` resolves/rejects |
 | `tab_changed` | Tab switch |
 | `extract_clicked` | Extract button |
 | `log_recorded` | Per-log entry |
@@ -183,8 +187,11 @@ Owns the "validate all" flow and the auto-validate setting.
 | `autoValidate` / `autoValidateRef` | State + ref mirror of the auto-validate toggle; the ref exists so async callbacks (e.g. inside `useGoogleSearchScrape`) can read the current value without becoming a `useEffect` dependency. |
 | `loadAutoValidateSetting()` | Reads the persisted `autoValidate` flag from `chrome.storage.local` on mount. |
 | `toggleAutoValidate(value)` | Updates state, the ref, and persists the new value to `chrome.storage.local`. |
-| `validateAllLinks(targetLinks?)` | Calls `validateMultipleLinksWithProgress`, tracking `isValidating`, `validationProgress` (`{ done, total }`), and `inFlightLinks` (links currently being fetched, added on `onStart` and removed on completion). Fires `validate_links_started` / `validate_links_completed` / an error event on failure. |
+| `validateAllLinks(targetLinks?)` | Calls `validateMultipleLinksWithProgress`, tracking `isValidating`, `validationProgress` (`{ done, total }`), `inFlightLinks` (links currently being fetched, added on `onStart` and removed on completion), and `queuedLinks` (every link still awaiting a result this run — a superset of `inFlightLinks` that also covers links queued behind `validationLimiter`'s concurrency cap). Each call bumps a `runIdRef` counter; its own progress/completion callbacks check `runIdRef` still matches before touching state, so a run superseded by `cancelValidation`/`retryValidation` can't race a newer run's updates. Fires `validate_links_started` / `validate_links_completed` / an error event on failure. |
 | `isValidating` | True while a validation pass is running. |
+| `cancelValidation()` | Bumps `runIdRef` (so the stalled run's pending callbacks become no-ops), clears `isValidating`/`inFlightLinks`/`queuedLinks`, and fires `validate_links_cancelled`. Doesn't abort in-flight requests — `validateLink`'s own 8s timeout and `validateLinkWithStorage`'s in-flight map handle those. |
+| `retryValidation()` | Bumps `runIdRef` to supersede the stalled run, then calls `validateAllLinks` again with just `queuedLinks` (what hadn't finished yet) and fires `validate_links_retried`. |
+| `queuedLinks` | Returned separately from `inFlightLinks` so `ValidationProgress` can show a "next up" link even when nothing is actively in flight (every remaining link is a cache hit resolving without ever touching `validationLimiter`). |
 
 ### `useGoogleSearchScrape({ autoValidateRef, currentURL, searchLinks, setCurrentTab, setLinks, validateAllLinks })` — `src/hooks/use-google-search-scrape.ts`
 
@@ -196,7 +203,7 @@ Owns the Google Search bulk-extract flow.
 
 ### `useCachedValidations(links)` — `src/hooks/use-cached-validations.ts`
 
-Re-reads `chrome.storage.local`'s `"validations"` entry whenever `links` changes and returns a `Record<string, LinkValidation>` scoped to just those links. Used by `Links.tsx` to drive status badges, the filter bar, and dedupe — it does not itself trigger any network requests.
+Re-reads `chrome.storage.local`'s `"validations"` entry whenever `links` changes and returns a `Record<string, LinkValidation>` scoped to just those links, plus a `reload()` callback that re-runs the same read on demand. Used by `Links.tsx` to drive status badges, the filter bar, and dedupe — it does not itself trigger any network requests. `Links.tsx` calls `reload()` after `clearValidationCache()` so the table reflects the wipe immediately instead of waiting for `links` to change.
 
 ### `useSystemTheme()` — `src/hooks/use-system-theme.ts`
 
@@ -219,10 +226,10 @@ Root component rendered by `src/popup/index.tsx`. It owns the top-level state be
 | `currentURL` | `string \| undefined` | URL of the active tab |
 | `googleSearchLinks` | `string[]` | All `<a>` hrefs scraped from the Google search DOM |
 | `links` | `string[]` | Final deduplicated WhatsApp invite links |
-| `otherLinks` | `string[]` | Non-WhatsApp links found on a non-Google page; shown in a collapsible list in `EmptyState.tsx` (`http`/`https` entries are clickable, other schemes render as plain text) |
-| `currentTab` | `'links' \| 'logs' \| 'help'` | Active tab |
+| `otherLinks` | `string[]` | Non-WhatsApp links found on a non-Google page; shown in a modal dialog opened from `EmptyState.tsx` (`http`/`https` entries are clickable, other schemes render as plain text) |
+| `currentTab` | `string` (`'links' \| 'logs' \| 'help'` or `'x'` for the Home tab) | Active tab |
 
-`isLoading`/`logs` come from `useGoogleSearchScrape`; `isValidating`/`validationProgress`/`inFlightLinks`/`autoValidate` come from `useLinkValidation`.
+`isLoading`/`logs` come from `useGoogleSearchScrape`; `isValidating`/`validationProgress`/`inFlightLinks`/`autoValidate`/`cancelValidation`/`retryValidation` come from `useLinkValidation`.
 
 ### Operational modes
 
@@ -256,23 +263,29 @@ Displays the logo, extension name, and a "Buy Me a Coffee" link. Shown on the in
 
 Props: `isGoogleSearchPage`, `searchLinksCount`, `otherLinks`, `isLoading`, `showExtractAgain`, `onExtractClick`.
 
-Renders the initial/fallback screen shown by `App.tsx` whenever no tab (links/logs/help) is active for the current state: `<Header>`, plus either the "no WhatsApp group link on this page" message (direct-page mode, with a collapsible list of `otherLinks` if non-empty — `http`/`https` entries render as clickable links, other schemes render as plain text) or the Google Search "Extract"/"Extract again" button and result count (Google Search mode). `onExtractClick` is wired by `App.tsx` to fire the `extract_clicked` analytics event before calling `fetchAll()`.
+Renders the initial/fallback screen shown by `App.tsx` whenever no tab (links/logs/help) is active for the current state: `<Header>`, plus either the "no WhatsApp group link on this page" message (direct-page mode, with a **Show other links** button opening a modal `<Dialog>` listing `otherLinks` if non-empty — `http`/`https` entries render as clickable links, other schemes render as plain text) or the Google Search "Extract"/"Extract again" button and result count (Google Search mode). `onExtractClick` is wired by `App.tsx` to fire the `extract_clicked` analytics event before calling `fetchAll()`.
 
 ### `Links`
 
-Props: `links`, `isLoading`, `fetchAll`, `isGoogleSearch`, `onValidateAll`, `isValidating`, `validationProgress`, `inFlightLinks`, `autoValidate`, `onToggleAutoValidate`.
+Props: `links`, `isLoading`, `fetchAll`, `isGoogleSearch`, `onValidateAll`, `onCancelValidation`, `onRetryValidation`, `isValidating`, `validationProgress`, `inFlightLinks`, `queuedLinks`, `autoValidate`, `onToggleAutoValidate`.
 
-- Calls `useCachedValidations(links)` to read cached statuses for the current link set.
+- Calls `useCachedValidations(links)` to read cached statuses for the current link set, and its own `isLoading` flag (true only for the first read) to show `<LinksSkeleton>` instead of an empty table while cached validations load.
 - Holds local `statusFilter` (`StatusFilter`, default `'all'`) and `hideDuplicates` (boolean) UI state.
 - Derives `statusCounts` (`getStatusCounts`), `filteredLinks` (`filterLinksByStatus`), and `displayedLinks` (`dedupeLinksByGroupName` applied on top, when `hideDuplicates` is on).
-- Renders a spinner while loading.
-- Renders a sticky header (`<Actions>` + `<LinkFilterBar>`, shown only once there's at least one link) above a `TableVirtuoso` (`react-virtuoso`) — rows beyond the visible viewport (420px tall) aren't mounted, so extraction results in the thousands don't bloat the DOM. Each row is rendered by `<LinkRow>`.
+- `handleClearCache()` — passed to `<Actions>` as `onClearCache`. Calls `clearValidationCache()`, fires `validation_cache_cleared`, then calls `useCachedValidations`'s `reload()` so the table reflects the wipe immediately; fires `clear_cache_error` if the storage call rejects.
+- Renders a spinner while `isLoading` (the extraction/scrape prop) is true.
+- When `links.length === 0` (reachable in Google Search mode once extraction has run but found nothing — `App.tsx` keeps this tab mounted via `hasFetched`), renders a centered "No WhatsApp group links found/extracted" message instead of an empty table, with an **Extract again** button in Google Search mode.
+- Otherwise renders a sticky header (`<Actions>`) above either `<LinksSkeleton>` (while cached validations are still loading) or a `TableVirtuoso` (`react-virtuoso`) — rows beyond the visible viewport aren't mounted, so extraction results in the thousands don't bloat the DOM. Each row is rendered by `<LinkRow>`.
 
-### `LinkFilterBar`
+### `LinksSkeleton`
 
-Props: `hideDuplicates`, `onStatusFilterChange`, `onToggleHideDuplicates`, `statusCounts`, `statusFilter`.
+No props. Renders a `<Table>` of 6 placeholder rows (`<Skeleton>` blocks for the avatar, name, URL, and status badge) shown by `Links` while `useCachedValidations` performs its first read from `chrome.storage.local`.
 
-Renders one button per `StatusFilter` value that currently has at least one match (plus `'all'`, always shown), each labelled with its count and coloured via `getStatusColor`/tinted background when inactive. A trailing **Hide duplicates** toggle button collapses links that resolved to the same group name (`dedupeLinksByGroupName`).
+### `FilterMenu`
+
+Props: `hideDuplicates`, `isOpen`, `onOpenChange`, `onStatusFilterChange`, `onToggleHideDuplicates`, `statusCounts`, `statusFilter`.
+
+A dropdown (shadcn `DropdownMenu`, rendered by `Actions`) labelled `Filter: <active status>`. Contains a radio group listing every `StatusFilter` value that currently has at least one match (plus `'all'`, always shown) with its count, and a trailing **Hide duplicates** checkbox item that collapses links that resolved to the same group name (`dedupeLinksByGroupName`).
 
 ### `LinkRow`
 
@@ -282,16 +295,18 @@ Renders one table row: row number, the group's avatar (`validation.iconUrl`, if 
 
 ### `Actions`
 
-Sticky action bar rendered above the links table (and above `<LinkFilterBar>`). Contains:
+Sticky action bar rendered above the links table. Contains:
 
-- Link count — `Total: N`, or `Showing M of N` once the filter bar/dedupe toggle have narrowed what's visible (`isScoped`).
+- Link count — `Total: N`, or `Showing M of N` once the filter menu/dedupe toggle have narrowed what's visible (`isScoped`).
 - **Extract again** button (Google Search mode only, shown after first extraction).
 - **Validate links** / **Re-validate links** button (label depends on whether any validation exists yet; shows a spinner while validating).
 - **Auto-validate** switch (only rendered when `onToggleAutoValidate` is passed) — persists the setting via `useLinkValidation`.
+- `<FilterMenu>` — status filter + Hide duplicates dropdown.
 - `<ExportMenu>` — copy/download actions.
-- `<ValidationProgress>` — rendered inline while `isValidating` is true.
+- **Clear cache** button (destructive variant, shown once there's at least one link) — opens an `<AlertDialog>` warning that every cached status/name/icon will be deleted, not just what's shown; confirming fires `clear_cache_confirmed` and calls `onClearCache` (wired to `Links.tsx`'s `handleClearCache`).
+- A `<Dialog>` showing `<ValidationProgress>` (`onCancel={onCancelValidation}`/`onRetry={onRetryValidation}` wired in) while `isValidating` is true. Unlike a fully-modal dialog, it can be minimized: the chevron button, Escape, or an outside press all call `minimizeProgress()` (fires `validation_progress_minimized`) instead of closing it outright — validation keeps running in the background. While minimized, a floating pill button (`Validating... done/total`, fixed bottom-right) calls `restoreProgress()` (fires `validation_progress_restored`) to reopen it. A new validation run always reopens the dialog even if the previous run had been minimized.
 
-Copy/download always operate on `visibleLinks` (whatever the filter bar + dedupe toggle currently show), not the full extracted `links` array — exports match what's on screen. A `valid`-scoped export (see `ExportMenu` below) further narrows to links whose cached status is `'valid'`.
+Copy/download always operate on `visibleLinks` (whatever the filter menu + dedupe toggle currently show), not the full extracted `links` array — exports match what's on screen. A `valid`-scoped export (see `ExportMenu` below) further narrows to links whose cached status is `'valid'`.
 
 ### `ExportMenu`
 
@@ -305,9 +320,9 @@ A single dropdown (shadcn `DropdownMenu`) replacing the old standalone Copy/Down
 
 ### `ValidationProgress`
 
-Props: `fallbackTotal`, `inFlightLinks?`, `validationProgress?` (`{ done, total }`).
+Props: `fallbackTotal`, `inFlightLinks?`, `queuedLinks?`, `validationProgress?` (`{ done, total }`), `onCancel?`, `onRetry?`.
 
-Renders a `<Progress>` bar plus a status line showing which link is currently being validated (and how many more are in flight) and a `done/total (pct%)` counter. Estimates remaining time assuming ~120 validations/minute (matching `validationLimiter`'s `minTime: 500`ms pacing), shown once more than a minute's worth of work remains.
+Renders a `<Progress>` bar plus a status line showing which link is currently being validated (and how many more are in flight) and a `done/total (pct%)` counter. The displayed link falls back to the head of `queuedLinks` when `inFlightLinks` is empty, since cache-hit links resolve without ever touching the rate limiter and would otherwise leave the line blank mid-run. Estimates remaining time assuming ~120 validations/minute (matching `validationLimiter`'s `minTime: 500`ms pacing), shown once more than a minute's worth of work remains. If `progressDone` hasn't advanced for 12 seconds (`STUCK_THRESHOLD_MS`), renders an `<Alert>` explaining the run is likely rate-limited, with **Retry**/**Cancel** buttons calling `onRetry`/`onCancel` if provided.
 
 ### `Logs`
 
@@ -323,7 +338,7 @@ No props. Always-available tab (`currentTab === 'help'`) covering: a short how-t
 
 ### `Tabs`
 
-Generic tab selector (wraps shadcn `Tabs`/`TabsList`/`TabsTrigger`). Renders tab buttons and calls `onTabSelected` with the chosen key. `App.tsx` builds the tab list dynamically: Logs and Links tabs only appear once relevant (`hasFetched` in Google Search mode, `links.length > 0` otherwise); "Help & FAQs" is always present.
+Generic tab selector (wraps shadcn `Tabs`/`TabsList`/`TabsTrigger`). Renders tab buttons and calls `onTabSelected` with the chosen key. `App.tsx` builds the tab list dynamically: a **Home** tab (key `'x'`) appears on Google Search pages, or whenever the current tab is Help & FAQs, and selecting it clears `currentTab` to a value that matches none of `links`/`logs`/`help` — falling through to `showFallback` so `<EmptyState>` renders, giving the user a way back to the Extract screen. Logs and Links tabs only appear once relevant (`hasFetched` in Google Search mode, `links.length > 0` otherwise); "Help & FAQs" is always present.
 
 ### `ui/` (shadcn / base-ui component library)
 
@@ -350,6 +365,9 @@ npm run watch        # Incremental build (webpack --watch)
 npm run build        # Production build → dist/ + dist.zip
 npm run clean        # Delete dist* directories
 npm run style        # Format with Prettier
+npm run lint         # Lint with ESLint (ts/tsx)
+npm run lint:fix     # Lint and auto-fix
+npm run typecheck    # Type-check with tsc (no emit)
 node server.js       # Serve dist/ at http://localhost:5000
 ```
 

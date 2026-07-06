@@ -58,14 +58,15 @@ When on `google.com/search`, the extension collects all result URLs and lets you
 | Bulk Google extraction | Scrapes all Google Search result pages in parallel |
 | Link validation | Fetches each invite page and reads its group name/icon to decide active vs. expired |
 | Auto-validate | Optional toggle (persisted in `chrome.storage.local`) that validates links automatically as soon as they're extracted, instead of waiting for a manual click |
-| Status filter bar | Filter the links table to one status at a time (Active/Expired/Invalid/Rate-limited/Pending), with live counts per status |
+| Filter menu | Dropdown to filter the links table to one status at a time (Active/Expired/Invalid/Rate-limited/Pending), with live counts per status |
 | Hide duplicates | Collapses invite links that resolve to the same validated group name |
 | Group name & photo | Validated links show the scraped group name and icon inline, not just the raw URL |
-| Validation progress | Live progress bar with done/total count, which link(s) are currently in flight, and an ETA hint |
+| Validation progress | Dialog with a live progress bar, done/total count, which link(s) are currently in flight, and an ETA hint — detects stalled/rate-limited runs and offers Cancel/Retry. Can be minimized to a floating pill while validation keeps running in the background |
 | Export menu | Single dropdown for Copy as Text, Copy as JSON, and Download CSV — scoped to either the currently shown/filtered links or valid-only links |
 | Virtualized links table | Table rows are windowed (`react-virtuoso`) so lists with thousands of links stay smooth |
 | Scrape logs | Shows per-URL progress and errors during extraction |
 | Validation caching | Results cached for 24 hours in `chrome.storage.local` (bypassed for rate-limited results, which always retry) |
+| Clear cache | Deletes every cached validation result (not just what's currently shown) so the next run re-checks everything from scratch — guarded by a confirmation dialog |
 | Help & FAQs tab | Always-available in-popup how-to and FAQ list, no need to leave the extension |
 | Analytics | Anonymous GA4 usage tracking (Measurement Protocol) |
 
@@ -98,12 +99,13 @@ grab-whatsapp-group-invite-links/
 │       ├── App.tsx            # Shared root — owns top-level state, wires the hooks above
 │       ├── Header.tsx         # Logo + Buy Me a Coffee
 │       ├── EmptyState.tsx     # Initial/fallback screen (no-links message or Extract button)
-│       ├── Links.tsx          # Virtualized links table (react-virtuoso) + filter bar
-│       ├── LinkFilterBar.tsx  # Status filter chips + "Hide duplicates" toggle
+│       ├── Links.tsx          # Virtualized links table (react-virtuoso) + filter menu
+│       ├── LinksSkeleton.tsx  # Table skeleton shown while cached validations first load
+│       ├── FilterMenu.tsx     # Status filter dropdown + "Hide duplicates" toggle
 │       ├── LinkRow.tsx        # One link's row: group name/photo, URL, status badge, last-checked
-│       ├── Actions.tsx        # Sticky action bar (validate, auto-validate switch, export)
+│       ├── Actions.tsx        # Sticky action bar (validate, auto-validate switch, filter, export)
 │       ├── ExportMenu.tsx     # Copy as Text/JSON + Download CSV, scoped to shown or valid-only
-│       ├── ValidationProgress.tsx # Live validate-all progress bar with ETA
+│       ├── ValidationProgress.tsx # Validate-all progress bar with ETA, rendered in a modal dialog by Actions.tsx
 │       ├── Logs.tsx           # Scrape progress log table
 │       ├── HelpFaq.tsx        # In-popup how-to-use + FAQ accordion
 │       ├── Tabs.tsx           # Links / Logs / Help & FAQs tab switcher
@@ -167,12 +169,15 @@ user clicks "Validate links" (or auto-validate is on, so this runs automatically
             → cheerio reads #main_block h3 (group name) and #main_block img (group icon)
             → name present → 'valid'; page loads with no name → 'expired'
         → write result (status, name, iconUrl) back to chrome.storage.local
-        → onStart/onProgress callbacks drive the live ValidationProgress bar and "currently validating" list
+        → onStart/onProgress callbacks drive the ValidationProgress bar (shown in a dialog, minimizable to a floating pill) and "currently validating" list
+    → if progress stalls, the dialog offers Cancel/Retry (backed by run-ID invalidation, so a superseded run's callbacks become no-ops)
     → Links table re-reads storage via useCachedValidations and re-renders
-    → status filter bar + "Hide duplicates" narrow what's displayed; status badges (Active / Expired / Invalid / Rate-limited) rendered per row
+    → Filter menu + "Hide duplicates" narrow what's displayed; status badges (Active / Expired / Invalid / Rate-limited) rendered per row
 ```
 
 During Google Search scraping, each link is also individually queued for validation the moment it's extracted (independent of the bulk "Validate links" button), so status badges start filling in while extraction is still running.
+
+"Clear cache" (in `<Actions>`, confirmed via an alert dialog) deletes the entire `"validations"` entry from `chrome.storage.local`, then reloads the Links table's cached-validations read so status badges reset immediately — the next "Validate links" run re-checks every link from scratch.
 
 ---
 

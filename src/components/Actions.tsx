@@ -3,8 +3,20 @@ import { useEffect, useState } from 'react';
 // Deep imports (instead of `from 'lucide-react'`) avoid pulling the whole icon set into the
 // bundle — lucide-react's barrel file isn't tree-shaken by this webpack config and previously
 // added ~1.5MB to vendors.js for 3 icons.
+import ChevronDownIcon from 'lucide-react/dist/esm/icons/chevron-down.mjs';
 import Loader2Icon from 'lucide-react/dist/esm/icons/loader-2.mjs';
+import Trash2Icon from 'lucide-react/dist/esm/icons/trash-2.mjs';
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -25,12 +37,13 @@ interface PropTypes {
   links: string[];
   visibleLinks: string[];
   onFetch: VoidFunction;
-  onValidateAll?: VoidFunction;
+  onValidateAll?: (targetLinks?: string[]) => void;
   onCancelValidation?: VoidFunction;
   onRetryValidation?: VoidFunction;
   isValidating?: boolean;
   validationProgress?: { done: number; total: number };
   inFlightLinks?: string[];
+  queuedLinks?: string[];
   validations?: Record<string, LinkValidation>;
   autoValidate?: boolean;
   onToggleAutoValidate?: (value: boolean) => void;
@@ -39,6 +52,7 @@ interface PropTypes {
   statusCounts: Record<StatusFilter, number>;
   hideDuplicates: boolean;
   onToggleHideDuplicates: VoidFunction;
+  onClearCache: VoidFunction;
 }
 
 function Actions({
@@ -53,6 +67,7 @@ function Actions({
   isValidating,
   validationProgress,
   inFlightLinks,
+  queuedLinks,
   validations,
   autoValidate,
   onToggleAutoValidate,
@@ -61,14 +76,39 @@ function Actions({
   statusCounts,
   hideDuplicates,
   onToggleHideDuplicates,
+  onClearCache,
 }: PropTypes) {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isClearCacheOpen, setIsClearCacheOpen] = useState(false);
   const [exportScope, setExportScope] = useState<ExportScope>('shown');
   const [hasCopyAsJSON, setHasCopyAsJSON] = useState(false);
   const [isCopyAsJSON, setIsCopyAsJSON] = useState(false);
   const [hasCopyAsText, setHasCopyAsText] = useState(false);
   const [isCopyAsText, setIsCopyAsText] = useState(false);
+  const [isProgressMinimized, setIsProgressMinimized] = useState(false);
+
+  // Each new validation run re-opens the detailed dialog, even if the previous run had been
+  // minimized — only fires on the false->true edge, so it won't fight a minimize click mid-run.
+  useEffect(() => {
+    if (isValidating) {
+      setIsProgressMinimized(false);
+    }
+  }, [isValidating]);
+
+  const minimizeProgress = () => {
+    Analytics.fireEvent('validation_progress_minimized');
+    setIsProgressMinimized(true);
+  };
+
+  const restoreProgress = () => {
+    Analytics.fireEvent('validation_progress_restored');
+    setIsProgressMinimized(false);
+  };
+
+  // Mirrors ValidationProgress's fallback so the floating pill's count matches the dialog's.
+  const progressDone = validationProgress?.done ?? 0;
+  const progressTotal = validationProgress?.total ?? links.length;
 
   // "Copy/Download" actions operate on whatever the status filter + dedupe toggle currently show,
   // not the full extracted set — so exports always match what's on screen.
@@ -92,9 +132,16 @@ function Actions({
 
   const onValidateHandler = () => {
     if (onValidateAll) {
-      Analytics.fireEvent('validate_all_clicked', { total_links: links.length });
-      onValidateAll();
+      const targetLinks = isScoped ? visibleLinks : undefined;
+      Analytics.fireEvent('validate_all_clicked', { total_links: (targetLinks ?? links).length, scoped: isScoped });
+      onValidateAll(targetLinks);
     }
+  };
+
+  const onClearCacheConfirm = () => {
+    Analytics.fireEvent('clear_cache_confirmed', { total_links: links.length });
+    setIsClearCacheOpen(false);
+    onClearCache();
   };
 
   const handleCopy = async (format: string) => {
@@ -180,11 +227,21 @@ function Actions({
             type="button"
             size="sm"
             onClick={onValidateHandler}
-            disabled={isValidating}
-            title="Check each link's status (active / expired / invalid)"
+            disabled={isValidating || (isScoped && visibleLinks.length === 0)}
+            title={
+              isScoped
+                ? `Check the status of just the ${visibleLinks.length} link(s) shown`
+                : "Check each link's status (active / expired / invalid)"
+            }
           >
             {isValidating && <Loader2Icon className="animate-spin" />}
-            {isValidating ? 'Validating...' : hasAnyValidation ? 'Re-validate links' : 'Validate links'}
+            {isValidating
+              ? 'Validating...'
+              : isScoped
+                ? `Validate ${visibleLinks.length} shown`
+                : hasAnyValidation
+                  ? 'Re-validate links'
+                  : 'Validate links'}
           </Button>
         )}
         {onToggleAutoValidate && (
@@ -223,26 +280,75 @@ function Actions({
             visibleLinksCount={visibleLinks.length}
           />
         )}
+        {links.length > 0 && (
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            onClick={() => setIsClearCacheOpen(true)}
+            title="Delete cached validation results so every link is re-checked from scratch"
+          >
+            <Trash2Icon />
+            Clear cache
+          </Button>
+        )}
       </div>
-      {/* `open` is fully controlled by isValidating with a no-op onOpenChange, so neither
-          Escape nor an outside press can close it early — disablePointerDismissal just
-          suppresses the outside-press animation/focus attempt on top of that. It only
-          closes once validation actually finishes. */}
-      <Dialog open={!!isValidating} onOpenChange={() => {}} disablePointerDismissal>
+      {/* Validation keeps running in the background regardless of this dialog's visibility —
+          `open` only controls whether the detailed view is shown. Escape/outside-press and the
+          chevron button both minimize rather than close, so progress is never hidden for good
+          until validation actually finishes. */}
+      <Dialog open={!!isValidating && !isProgressMinimized} onOpenChange={(open) => !open && minimizeProgress()}>
         <DialogContent showCloseButton={false} className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Validating links</DialogTitle>
-            <DialogDescription>This closes automatically once every link has been checked.</DialogDescription>
+          <DialogHeader className="flex-row items-start justify-between gap-2">
+            <div className="flex flex-col gap-2">
+              <DialogTitle>Validating links</DialogTitle>
+              <DialogDescription>
+                Keep working while this runs in the background — minimize it and reopen anytime from the floating indicator.
+              </DialogDescription>
+            </div>
+            <Button type="button" size="icon-sm" variant="ghost" onClick={minimizeProgress} title="Minimize">
+              <ChevronDownIcon />
+            </Button>
           </DialogHeader>
           <ValidationProgress
             fallbackTotal={links.length}
             inFlightLinks={inFlightLinks}
+            queuedLinks={queuedLinks}
             validationProgress={validationProgress}
             onCancel={onCancelValidation}
             onRetry={onRetryValidation}
           />
         </DialogContent>
       </Dialog>
+      {isValidating && isProgressMinimized && (
+        <Button
+          type="button"
+          size="sm"
+          onClick={restoreProgress}
+          title="Show validation progress"
+          className="fixed right-3 bottom-3 z-50 shadow-lg"
+        >
+          <Loader2Icon className="animate-spin" />
+          {`Validating... ${progressDone}/${progressTotal}`}
+        </Button>
+      )}
+      <AlertDialog open={isClearCacheOpen} onOpenChange={setIsClearCacheOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear validation cache?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Every cached status, name, and icon for links you&apos;ve checked will be deleted — not just the ones shown here. The next
+              validation will re-check everything from scratch.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={onClearCacheConfirm}>
+              Clear cache
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

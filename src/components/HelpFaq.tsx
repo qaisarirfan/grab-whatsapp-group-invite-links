@@ -13,17 +13,22 @@ const FAQS: { question: string; answer: string }[] = [
   {
     question: 'Why does it say there is no WhatsApp group link on this page?',
     answer:
-      'The page you are on does not contain any chat.whatsapp.com links. If other links were found, the message tells you how many, but they are not listed since they are not WhatsApp links.',
+      'The page you are on does not contain any chat.whatsapp.com links. If other links were found, the message tells you how many, and Show other links opens a small window listing them.',
   },
   {
     question: 'I clicked Extract but got an empty list. What do I do?',
     answer:
-      'None of the Google search results contained a WhatsApp link. Close the popup and reopen it to start over, or try a more specific search.',
+      'None of the Google search results contained a WhatsApp link. The Links tab shows this directly with its own Extract again button so you can retry right away, or try a more specific search.',
   },
   {
     question: 'What should I search for on Google to find more WhatsApp groups?',
     answer:
       'Try adding "site:chat.whatsapp.com" plus a topic keyword to your Google search, such as "site:chat.whatsapp.com yoga". Since Extract only reads the current results page, page through Google\'s results and click Extract again on each page for more links.',
+  },
+  {
+    question: 'What is the Home tab for?',
+    answer:
+      'It appears while you are using Google Search mode, or whenever Help & FAQs is open, as a way back to the starting screen, handy for running a fresh search or starting over.',
   },
   {
     question: 'Why does a search result show an error in red in the Logs tab?',
@@ -39,9 +44,19 @@ const FAQS: { question: string; answer: string }[] = [
     answer: 'The check took too long without a response and was stopped. Try validating again later.',
   },
   {
+    question: 'Why did a warning appear saying there is no progress during validation?',
+    answer:
+      'If validation shows no progress for about 12 seconds, WhatsApp is likely rate-limiting the requests. A warning appears with Retry (re-checks just the unfinished links) and Cancel (stops waiting on those) buttons.',
+  },
+  {
     question: 'Why did Validate links not re-check a link I just validated?',
     answer:
       'Results are cached for 24 hours per link. Validating again within that window reuses the earlier result. The "Last checked" date under each link shows when it was last actually verified.',
+  },
+  {
+    question: 'What does Clear cache do, and when should I use it?',
+    answer:
+      'It deletes every cached validation result, not just the links currently shown, so the next validation run re-checks everything from scratch. Use it if you suspect results are stale. It asks you to confirm first since it cannot be undone.',
   },
   {
     question: 'I clicked Copy as Text (or JSON) but nothing was copied. What happened?',
@@ -57,6 +72,11 @@ const FAQS: { question: string; answer: string }[] = [
     question: 'Should I turn on Auto-validate?',
     answer:
       'It is handy if you always want to know link status without an extra click, but every found link gets checked immediately, which takes longer for large result sets. It is off by default, turn it on if you would rather not remember to click Validate links yourself.',
+  },
+  {
+    question: 'Can I keep using the extension while links are validating?',
+    answer:
+      'Yes. Click the arrow in the corner of the validating window (or press Escape, or click outside it) to minimize it to a small floating button. Validation keeps running in the background, and clicking that button brings the full progress window back.',
   },
   {
     question: 'Can I redo an extraction or re-check links?',

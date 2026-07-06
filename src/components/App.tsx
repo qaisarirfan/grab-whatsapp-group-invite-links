@@ -31,11 +31,13 @@ function App() {
     inFlightLinks,
     isValidating,
     loadAutoValidateSetting,
+    queuedLinks,
     retryValidation,
     toggleAutoValidate,
     validateAllLinks,
     validationProgress,
   } = useLinkValidation(links, setLinks);
+
   const { fetchAll, hasFetched, isLoading, logs } = useGoogleSearchScrape({
     autoValidateRef,
     currentURL,
@@ -122,6 +124,12 @@ function App() {
             setCurrentTab(tab);
           }}
         />
+        <div className="flex items-center gap-3 fixed top-2 right-3">
+          <p>Support me on</p>
+          <a href="https://www.buymeacoffee.com/qaisarirfan" target="_blank" rel="noreferrer">
+            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" className="h-7.5" />
+          </a>
+        </div>
       </div>
       {currentTab === 'links' && showLinksTab && (
         <Links
@@ -135,6 +143,7 @@ function App() {
           isValidating={isValidating}
           validationProgress={validationProgress}
           inFlightLinks={inFlightLinks}
+          queuedLinks={queuedLinks}
           autoValidate={autoValidate}
           onToggleAutoValidate={toggleAutoValidate}
         />

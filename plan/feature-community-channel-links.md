@@ -2,7 +2,7 @@
 
 Created: 2026-06-23. Not yet implemented as of 2026-07-04.
 
-> **Architecture note (2026-07-04):** since this plan was written, `src/popup/index.tsx` was reduced to a thin mount wrapper (`createRoot` + `<App context="popup" />`). All the state and flow this plan describes as living in `popup/index.tsx` now lives in `src/components/App.tsx` and two extracted hooks, `src/hooks/use-link-validation.ts` and `src/hooks/use-google-search-scrape.ts`. The Links table was also split into `src/components/Links.tsx` (container: filtering, dedupe, virtualization) + `src/components/LinkRow.tsx` (one row) + `src/components/LinkFilterBar.tsx` (status filter chips), and the copy/download UI now lives in `src/components/ExportMenu.tsx` rather than directly in `Actions.tsx`. Steps below have been updated to point at the current file, but the underlying design (add a `LinkType` union, an `extractLinkWithType()` function, thread `WhatsAppLink[]` through state) is unchanged.
+> **Architecture note (2026-07-05):** since this plan was written, `src/popup/index.tsx` was reduced to a thin mount wrapper (`createRoot` + `<App />`) — the side panel entry point and `context` prop mentioned in earlier revisions of this note have since been removed entirely. All the state and flow this plan describes as living in `popup/index.tsx` now lives in `src/components/App.tsx` and two extracted hooks, `src/hooks/use-link-validation.ts` and `src/hooks/use-google-search-scrape.ts`. The Links table was also split into `src/components/Links.tsx` (container: filtering, dedupe, virtualization) + `src/components/LinkRow.tsx` (one row) + `src/components/FilterMenu.tsx` (status filter dropdown, previously a `LinkFilterBar.tsx` button row), and the copy/download UI now lives in `src/components/ExportMenu.tsx` rather than directly in `Actions.tsx`. Steps below have been updated to point at the current file, but the underlying design (add a `LinkType` union, an `extractLinkWithType()` function, thread `WhatsAppLink[]` through state) is unchanged.
 
 ---
 
@@ -192,9 +192,9 @@ const TYPE_COLOR: Record<LinkType, string> = {
 
 Render a `<Badge>` (shadcn, `@/components/ui/badge` — the same component `LinkRow` already uses for the status badge) next to each link's status badge.
 
-### 4b. Add type filter buttons in `src/components/LinkFilterBar.tsx`
+### 4b. Add type filter options in `src/components/FilterMenu.tsx`
 
-`LinkFilterBar` already renders one button per `StatusFilter` value with live counts (see `FILTER_KEYS`/`statusCounts`). A parallel `typeFilter` row would follow the same pattern — a `TYPE_FILTER_KEYS` array reusing the existing `Button` + count-badge markup, driven by counts computed alongside `getStatusCounts` in `src/components/Links.tsx`.
+`FilterMenu` already renders one radio item per `StatusFilter` value with live counts (see `FILTER_KEYS`/`statusCounts`). A parallel `typeFilter` radio group would follow the same pattern — a `TYPE_FILTER_KEYS` array reusing the existing `DropdownMenuRadioGroup` markup, driven by counts computed alongside `getStatusCounts` in `src/components/Links.tsx`.
 
 ### 4c. Thread `typeFilter` through `src/components/Links.tsx`
 
@@ -268,7 +268,7 @@ This is a breaking change to the `links` state shape (`string[]` → `WhatsAppLi
 2. Add new regex constants and `extractLinkWithType()` to `utils.ts` without removing old functions.
 3. Update `extractWhatsappLinks()`.
 4. Update `App.tsx` state and its two hooks (`use-link-validation.ts`, `use-google-search-scrape.ts`) and all their consumers.
-5. Update `Links.tsx`, `LinkRow.tsx`, `LinkFilterBar.tsx`, and `Actions.tsx`.
+5. Update `Links.tsx`, `LinkRow.tsx`, `FilterMenu.tsx`, and `Actions.tsx`.
 6. Remove old `inviteLink()` once no call site uses it.
 7. Update `validation.ts` call sites (and `use-cached-validations.ts`) to pass/key on `.url`.
 
@@ -299,7 +299,7 @@ This is a breaking change to the `links` state shape (`string[]` → `WhatsAppLi
 | `src/hooks/use-cached-validations.ts` | Key `validations` lookups by `.url` |
 | `src/components/Links.tsx` | Add `typeFilter` state, thread through the existing filter/dedupe pipeline |
 | `src/components/LinkRow.tsx` | Render type badge per row |
-| `src/components/LinkFilterBar.tsx` | Add type filter buttons alongside status filter chips |
+| `src/components/FilterMenu.tsx` | Add type filter options alongside the status filter radio group |
 | `src/components/Actions.tsx` | CSV/copy format update (`toCsvRow`, `handleCopy`) |
 | `src/validation.ts` | Call site update (`.url` instead of raw string); no structural change |
 | `src/analytics.ts` | Add type breakdown to events |

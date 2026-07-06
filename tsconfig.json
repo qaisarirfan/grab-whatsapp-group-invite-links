@@ -14,7 +14,8 @@
       "@/*": ["./src/*"],
       "@components/*": ["./src/components/*"],
       "@src/*": ["./src/*"]
-    }
+    },
+    "types": ["chrome"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "src/components/ui", "src/hooks/use-mobile.ts", "src/lib/utils.ts"]

@@ -2,12 +2,14 @@ import { useState } from 'react';
 import type { TableComponents } from 'react-virtuoso';
 import { TableVirtuoso } from 'react-virtuoso';
 
+import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { TableBody, TableHeader, TableRow } from '@/components/ui/table';
 
+import Analytics from '@src/analytics';
 import { useCachedValidations } from '@src/hooks/use-cached-validations';
 import type { StatusFilter } from '@src/validation';
-import { dedupeLinksByGroupName, filterLinksByStatus, getStatusCounts } from '@src/validation';
+import { clearValidationCache, dedupeLinksByGroupName, filterLinksByStatus, getStatusCounts } from '@src/validation';
 
 import Actions from './Actions';
 import LinkRow from './LinkRow';
@@ -31,12 +33,13 @@ interface PropTypes {
   isGoogleSearch: boolean;
   isLoading: boolean;
   links: string[];
-  onValidateAll?: VoidFunction;
+  onValidateAll?: (targetLinks?: string[]) => void;
   onCancelValidation?: VoidFunction;
   onRetryValidation?: VoidFunction;
   isValidating?: boolean;
   validationProgress?: { done: number; total: number };
   inFlightLinks?: string[];
+  queuedLinks?: string[];
   autoValidate?: boolean;
   onToggleAutoValidate?: (value: boolean) => void;
 }
@@ -52,10 +55,11 @@ function Links({
   isValidating,
   validationProgress,
   inFlightLinks,
+  queuedLinks,
   autoValidate,
   onToggleAutoValidate,
 }: PropTypes) {
-  const { isLoading: isLoadingValidations, validations } = useCachedValidations(links);
+  const { isLoading: isLoadingValidations, reload: reloadValidations, validations } = useCachedValidations(links);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [hideDuplicates, setHideDuplicates] = useState(false);
 
@@ -63,10 +67,38 @@ function Links({
   const filteredLinks = filterLinksByStatus(links, validations, statusFilter);
   const displayedLinks = hideDuplicates ? dedupeLinksByGroupName(filteredLinks, validations) : filteredLinks;
 
+  const handleClearCache = async () => {
+    try {
+      await clearValidationCache();
+      Analytics.fireEvent('validation_cache_cleared', { total_links: links.length });
+      await reloadValidations();
+    } catch (error) {
+      Analytics.fireErrorEvent({
+        context: 'clear_cache_error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center">
         <Spinner className="size-6 text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (links.length === 0) {
+    return (
+      <div className="flex h-[calc(100vh-57px)] flex-col items-center justify-center gap-3 text-center animate-in">
+        <p className="text-sm text-muted-foreground">
+          {isGoogleSearch ? 'No WhatsApp group links found in these search results.' : 'No WhatsApp group links extracted.'}
+        </p>
+        {isGoogleSearch && (
+          <Button type="button" variant="outline" size="sm" onClick={fetchAll}>
+            Extract again
+          </Button>
+        )}
       </div>
     );
   }
@@ -86,6 +118,7 @@ function Links({
           isValidating={isValidating}
           validationProgress={validationProgress}
           inFlightLinks={inFlightLinks}
+          queuedLinks={queuedLinks}
           validations={validations}
           autoValidate={autoValidate}
           onToggleAutoValidate={onToggleAutoValidate}
@@ -94,6 +127,7 @@ function Links({
           statusCounts={statusCounts}
           hideDuplicates={hideDuplicates}
           onToggleHideDuplicates={() => setHideDuplicates((v) => !v)}
+          onClearCache={handleClearCache}
         />
       </div>
       {isLoadingValidations ? (

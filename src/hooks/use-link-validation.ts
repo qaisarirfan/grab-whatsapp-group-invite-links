@@ -104,6 +104,7 @@ export function useLinkValidation(links: string[], setLinks: Dispatch<SetStateAc
     inFlightLinks,
     isValidating,
     loadAutoValidateSetting,
+    queuedLinks,
     retryValidation,
     toggleAutoValidate,
     validateAllLinks,

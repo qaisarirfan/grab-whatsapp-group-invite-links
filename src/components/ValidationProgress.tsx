@@ -20,12 +20,13 @@ const STUCK_THRESHOLD_MS = 12000;
 interface PropTypes {
   fallbackTotal: number;
   inFlightLinks?: string[];
+  queuedLinks?: string[];
   validationProgress?: { done: number; total: number };
   onCancel?: VoidFunction;
   onRetry?: VoidFunction;
 }
 
-function ValidationProgress({ fallbackTotal, inFlightLinks, validationProgress, onCancel, onRetry }: PropTypes) {
+function ValidationProgress({ fallbackTotal, inFlightLinks, queuedLinks, validationProgress, onCancel, onRetry }: PropTypes) {
   const progressDone = validationProgress?.done ?? 0;
   const progressTotal = validationProgress?.total ?? fallbackTotal;
   const remaining = progressTotal - progressDone;
@@ -42,16 +43,21 @@ function ValidationProgress({ fallbackTotal, inFlightLinks, validationProgress, 
     return () => clearTimeout(timer);
   }, [progressDone]);
 
+  // Cache-hit links resolve without ever touching the rate limiter, so inFlightLinks can be
+  // empty even mid-run — fall back to the next queued link so this line never goes blank.
+  const displayLink = inFlightLinks && inFlightLinks.length > 0 ? inFlightLinks[inFlightLinks.length - 1] : queuedLinks?.[0];
+
   return (
     <div className="flex w-full flex-col gap-2 py-2">
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground max-w-full">
+        <span>{`${progressDone}/${progressTotal} (${progressPercent}%)${etaHint}`}</span>
+        <span>{`${inFlightLinks && inFlightLinks.length > 1 ? ` (+${inFlightLinks.length - 1} more in flight)` : ''}`}</span>
+      </div>
       <Progress value={progressPercent} className="gap-0" />
       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground max-w-full">
         <span className="min-w-0 flex-1 truncate font-mono" title={inFlightLinks?.join('\n')}>
-          {inFlightLinks && inFlightLinks.length > 0
-            ? `Validating ${inFlightLinks[0]}${inFlightLinks.length > 1 ? ` (+${inFlightLinks.length - 1} more in flight)` : ''}`
-            : 'Validating...'}
+          {displayLink ? `Validating ${displayLink}` : 'Validating...'}
         </span>
-        <span>{`${progressDone}/${progressTotal} (${progressPercent}%)${etaHint}`}</span>
       </div>
       {isStuck && (
         <Alert>
