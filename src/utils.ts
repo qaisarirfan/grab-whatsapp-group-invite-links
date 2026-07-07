@@ -15,11 +15,6 @@ export const inviteLink = (link: string | undefined) => {
   return '';
 };
 
-export const isValidURL = (string: string) => {
-  const res = string.match(/(http(s)?:\/\/.)?(www\.)?[-a-zA-Z0-9@:%._\\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\\+.~#?&//=]*)/g);
-  return res !== null;
-};
-
 export const isGoogle = (location: string | undefined) => {
   if (!location) return false;
   const url = new URL(location);
@@ -29,9 +24,6 @@ export const isGoogle = (location: string | undefined) => {
 export const copyToClipboard = async (text: string) => {
   await navigator.clipboard.writeText(text);
 };
-
-// eslint-disable-next-line no-promise-executor-return
-export const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const parseUrl = (val: string) => {
   const parsedUrl = new URL(val);
@@ -69,8 +61,8 @@ export const handleError = (error: string) => ({
 });
 
 // Injected via chrome.scripting.executeScript, so this runs in the page's context and
-// cannot close over other module imports (e.g. isValidURL above) — the URL regex below
-// is intentionally duplicated rather than shared.
+// cannot close over other module imports — the URL regex below is intentionally
+// duplicated rather than shared.
 export const getAllAnchorTags = () => {
   const isGoogleSearch = `${window?.location?.origin}${window?.location?.pathname}` === 'https://www.google.com/search';
 
@@ -117,12 +109,4 @@ export const convertToCsv = (data: Record<string, unknown>[], filename: string) 
   };
   data.forEach((record) => parser.write(record));
   parser.end();
-};
-
-export default {
-  inviteLink,
-  isValidURL,
-  isGoogle,
-  copyToClipboard,
-  sleep,
 };
