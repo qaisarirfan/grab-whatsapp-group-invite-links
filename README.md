@@ -1,4 +1,4 @@
-# Grab WhatsApp groups links
+# Grab WhatsApp Group Invite Links
 
 ![build](https://github.com/qaisarirfan/grab-whatsapp-group-invite-links/workflows/build/badge.svg)
 

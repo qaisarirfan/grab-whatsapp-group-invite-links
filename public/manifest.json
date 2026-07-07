@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
 
-  "name": "Grab WhatsApp groups links",
-  "description": "Grab WhatsApp groups links",
+  "name": "Grab WhatsApp Group Invite Links",
+  "description": "Grab WhatsApp Group Invite Links",
   "version": "5.0.0",
 
   "action": {
