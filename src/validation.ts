@@ -33,8 +33,24 @@ const validationLimiter = new Bottleneck({
   minTime: 500, // 500ms between requests
 });
 
+// Derived from validationLimiter's minTime above (roughly 2 validations/sec regardless of
+// concurrency) — exported so UI ETA estimates (ValidationProgress, the auto-validate cost hint)
+// share one source of truth instead of each guessing the same number independently.
+export const VALIDATIONS_PER_MINUTE = 120;
+
 const VALIDATION_CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 const CACHE_VERSION = 2; // Bump when LinkValidation shape changes so stale cache entries are re-fetched
+
+// Bounds how long a validated link stays in chrome.storage.local at all. VALIDATION_CACHE_DURATION
+// above only controls freshness (when a cached result needs re-checking) — without this, every link
+// ever validated would accumulate in storage forever, since only a full clearValidationCache() wipe
+// ever removes anything.
+const STORAGE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+const pruneStaleEntries = (validations: Record<string, LinkValidation>): Record<string, LinkValidation> => {
+  const cutoff = Date.now() - STORAGE_RETENTION_MS;
+  return Object.fromEntries(Object.entries(validations).filter(([, v]) => v.lastValidated >= cutoff));
+};
 
 export const validateLink = async (link: string): Promise<Omit<LinkValidation, 'link' | 'lastValidated'>> => {
   try {
@@ -75,6 +91,26 @@ export const validateLink = async (link: string): Promise<Omit<LinkValidation, '
 // traffic to WhatsApp's servers.
 const inFlightValidations = new Map<string, Promise<LinkValidation>>();
 
+// Serializes every read-modify-write to the 'validations' storage key behind a single promise
+// chain. Without this, concurrent validations (validationLimiter allows 10 at once) each do their
+// own get-then-set with no locking: if two finish close together, the second's write is based on
+// a snapshot taken before the first's write landed, so it overwrites storage without the first
+// result — that link silently reverts to "pending" forever even though it was actually checked.
+let storageWriteQueue: Promise<void> = Promise.resolve();
+
+const persistValidation = (link: string, newValidation: LinkValidation): Promise<void> => {
+  const write = storageWriteQueue.then(async () => {
+    const latestStorage = (await chrome.storage.local.get('validations')) as StorageData;
+    const allValidations = pruneStaleEntries(latestStorage.validations || {});
+    allValidations[link] = newValidation;
+    await chrome.storage.local.set({ validations: allValidations });
+  });
+  // Chain off the write itself (not a .catch()-wrapped copy) so a failed write still surfaces to
+  // its own caller, but swallow here so one rejection doesn't wedge every write queued behind it.
+  storageWriteQueue = write.catch(() => {});
+  return write;
+};
+
 export const validateLinkWithStorage = async (link: string, onStart?: () => void): Promise<LinkValidation> => {
   // Check cache first, outside the rate limiter — a cache hit needs no network call and
   // shouldn't wait behind the validationLimiter's queue.
@@ -111,11 +147,9 @@ export const validateLinkWithStorage = async (link: string, onStart?: () => void
         ...result,
       };
 
-      // Store result — re-read storage here since it may have changed while this job was queued
-      const latestStorage = (await chrome.storage.local.get('validations')) as StorageData;
-      const allValidations = latestStorage.validations || {};
-      allValidations[link] = newValidation;
-      await chrome.storage.local.set({ validations: allValidations });
+      // Store result — queued so a concurrently-finishing validation can't clobber it (see
+      // persistValidation above).
+      await persistValidation(link, newValidation);
 
       return newValidation;
     })
@@ -127,11 +161,6 @@ export const validateLinkWithStorage = async (link: string, onStart?: () => void
   return validation;
 };
 
-export const validateMultipleLinks = async (links: string[]): Promise<LinkValidation[]> => {
-  const promises = links.map((link) => validateLinkWithStorage(link));
-  return Promise.all(promises);
-};
-
 export const validateMultipleLinksWithProgress = async (
   links: string[],
   onProgress: (done: number, link: string) => void,
@@ -139,11 +168,16 @@ export const validateMultipleLinksWithProgress = async (
 ): Promise<LinkValidation[]> => {
   let done = 0;
   const promises = links.map((link) =>
-    validateLinkWithStorage(link, () => onStart?.(link)).then((result) => {
-      done += 1;
-      onProgress(done, link);
-      return result;
-    })
+    validateLinkWithStorage(link, () => onStart?.(link))
+      // A storage failure (quota, extension context invalidated mid-write) must not reject this
+      // promise — Promise.all below would then abort every other still-running validation in the
+      // batch along with it, not just this one link.
+      .catch((): LinkValidation => ({ link, status: 'invalid', lastValidated: Date.now(), cacheVersion: CACHE_VERSION }))
+      .then((result) => {
+        done += 1;
+        onProgress(done, link);
+        return result;
+      })
   );
   return Promise.all(promises);
 };
