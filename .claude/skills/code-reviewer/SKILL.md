@@ -66,7 +66,7 @@ After emitting the report, apply every finding as a code edit:
 1. Work through findings top-down (Critical → Warning → Suggestion)
 2. Edit the exact file and line cited in the finding
 3. Do not rewrite unrelated code — scope each edit to the finding
-4. Run `npm run lint` after all edits and fix any new lint/type errors introduced (there is no `typecheck` script or test suite in this repo — `tsc` runs as part of `ts-loader` during `npm run build`, so build if type-level correctness is in doubt)
+4. Run `npm run lint` and `npm run typecheck` after all edits and fix any new lint/type errors introduced (there is no test suite in this repo). Note: webpack itself uses `babel-loader` (not `ts-loader`, despite it sitting in `devDependencies` unused) to transpile `.ts`/`.tsx`, and Babel's TypeScript preset only strips types — it does not type-check. A clean `npm run build` proves nothing about type correctness; only `npm run typecheck` does.
 5. Summarize fixes applied in a single closing block:
 
 ```
@@ -83,17 +83,20 @@ After emitting the report, apply every finding as a code edit:
 | What changed | Extra focus areas |
 | --- | --- |
 | `src/utils.ts` / `src/validation.ts` | Regex correctness for `chat.whatsapp.com` links, `axios`/`Bottleneck`/`axios-retry` timeout and rate-limit config, `cheerio` selector fragility, cache versioning (`cacheVersion`/`CACHE_VERSION`) |
-| `src/popup/index.tsx` | State/effect correctness on popup open (mount-once `useEffect`), `chrome.scripting.executeScript` injected function scoping, tab-switching logic, memory of in-flight/loading state across async fetch waves |
+| `src/popup/index.tsx` | Just the `createRoot`/render bootstrap — if this file starts growing state or effects, that logic belongs in `src/components/App.tsx` instead |
+| `src/components/App.tsx` + `src/hooks/*` | State/effect correctness on popup open (mount-once `useEffect`), `chrome.scripting.executeScript` injected function scoping (`getAllAnchorTags` can't close over module imports), tab-switching logic, in-flight/loading state across async fetch waves. Logic here is split across `use-google-search-scrape.ts`, `use-link-validation.ts`, `use-cached-validations.ts` — check the right hook, not just `App.tsx` |
 | `src/background.ts` | Service worker stays side-effect-light (install/update/uninstall URLs only) — no business logic creep |
-| `src/components/*.tsx` | Props typed explicitly, `styled-components` usage, accessibility of buttons/icons, controlled vs uncontrolled inputs, conditional `className` built with `cn()` (not template literals/ternaries) |
+| `src/components/*.tsx` (excluding `ui/`) | Props typed explicitly, accessibility of buttons/icons, controlled vs uncontrolled inputs, conditional `className` built with `cn()` (not template literals/ternaries), inline `style` used for anything a Tailwind/theme token or existing component variant could express instead (e.g. status colors — prefer reusing `destructive`/`secondary` tokens over new hardcoded hex) |
+| `src/components/ui/*` | This is shadcn CLI-scaffolded (`components.json`) — treat as vendored, not hand-written. When components are added/removed here, check reachability: `grep -rohE "@/components/ui/[a-zA-Z-]+" src --include="*.tsx" --include="*.ts" \| grep -v "src/components/ui/"` against `ls src/components/ui`. Unused primitives don't bloat the shipped JS (webpack tree-shakes unreached modules), but Tailwind's content scanner isn't reachability-aware — it still generates CSS for their classes, and their exclusive npm deps (e.g. `recharts`, `cmdk`, `sonner`) sit unused in `package.json`. A 2026-07-07 audit found 45/59 files unused, costing ~117 KiB of dead CSS and 73 unnecessary packages — worth a periodic check, not just a one-time cleanup |
 | `src/analytics.ts` | GA4 Measurement Protocol payload shape, `chrome.storage.local`/`chrome.storage.session` client/session ID handling, event names free of reserved GA4 words, no PII in event params |
 | `public/manifest.json` | Permissions stay minimal (`activeTab`, `scripting`, `storage`) and `host_permissions` scope is justified — flag any broadening |
-| `webpack/*.js` | Both entry points (`background`, `popup`) still resolve, path aliases (`@components/*`, `@src/*`) stay in sync with `tsconfig.json` |
+| `webpack/*.js` | Both entry points (`background`, `popup`) still resolve, path aliases (`@components/*`, `@src/*`) stay in sync with `tsconfig.json`. Note `ts-loader` sits in `devDependencies` but isn't wired into any webpack config — `babel-loader` does the actual `.ts`/`.tsx` transpilation (types stripped, not checked) |
 
 ## Key Project Facts to Keep in Mind
 
-- **Extension type:** Chrome Extension, Manifest V3, two entry points — `src/background.ts` (service worker, no business logic) and `src/popup/index.tsx` (the entire user-facing app).
-- **Stack:** React 19 + TypeScript (`strict: true`) + Webpack, built via `npm run build` / `npm run watch`. No test suite (`npm test` is expected to fail) and no `typecheck` npm script — use `npm run lint` and `npm run build` to surface type errors.
+- **Extension type:** Chrome Extension, Manifest V3, two entry points — `src/background.ts` (service worker, no business logic) and `src/popup/index.tsx` (render bootstrap only; the user-facing app itself is `src/components/App.tsx` and its hooks/components).
+- **Stack:** React 19 + TypeScript (`strict: true`) + Webpack, built via `npm run build` / `npm run watch`. No test suite (`npm test` is expected to fail). Use `npm run lint` and `npm run typecheck` to surface issues — `npm run build` alone does not type-check (see Fix Pass note above).
+- **Design system:** shadcn CLI-scaffolded (`components.json`, style `base-nova`), Tailwind v4 (`src/styles/globals.css` defines oklch light/dark tokens). The styled-components → Tailwind/shadcn migration (mentioned in `CLAUDE.md`) is now complete — there is no remaining `styled-components` usage anywhere in `src/`.
 - **Path aliases:** `@components/*` → `src/components/*`, `@src/*` → `src/*` (defined in both `tsconfig.json` and the webpack `TsconfigPathsPlugin`) — flag relative `../../` imports that should use these.
 - **Core flow:** popup injects `getAllAnchorTags` into the active tab via `chrome.scripting.executeScript`; on Google Search pages, links are queued for scraping via `fetchAll()` (`axios` + `Bottleneck` + `p-limit`); on other pages, `inviteLink()` filters anchors directly for `chat.whatsapp.com` invite URLs.
 - **Validation:** `validateMultipleLinksWithProgress()` (`src/validation.ts`) fetches each invite page, parses `#main_block` with `cheerio` for group name/icon, and caches results in `chrome.storage.local` for 24 hours, gated by `CACHE_VERSION` — any change to `LinkValidation`'s shape must bump `CACHE_VERSION` or stale cache entries will be served with missing/wrong fields.
