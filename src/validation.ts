@@ -157,19 +157,25 @@ export const clearValidationCache = async (): Promise<void> => {
   await chrome.storage.local.remove('validations');
 };
 
-export const getStatusColor = (status: LinkStatus): string => {
+// Tailwind utility classes rather than inline hex — these track the app's light/dark theme tokens
+// (globals.css) instead of hardcoding colors that would look wrong or low-contrast in dark mode.
+// 'expired' and 'rate-limited'/'pending' reuse the existing destructive/secondary design tokens;
+// 'valid'/'invalid' don't have a matching semantic token yet, so they use Tailwind's color scale.
+// Light-mode text uses the 700 shade rather than 600 — 600 measures 3.77:1 (emerald) / 3.19:1
+// (amber) against a white background, both below the 4.5:1 WCAG AA requires at this badge's font
+// size; 700 clears AA (5.48:1 / 5.02:1) while dark mode's 400 shade already passed at 10:1+.
+export const getStatusBadgeClassName = (status: LinkStatus): string => {
   switch (status) {
     case 'valid':
-      return '#28a745'; // green
+      return 'bg-emerald-500/10 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400';
     case 'expired':
-      return '#dc3545'; // red
+      return 'bg-destructive/10 text-destructive dark:bg-destructive/20';
     case 'invalid':
-      return '#ffc107'; // yellow
+      return 'bg-amber-500/10 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400';
     case 'rate-limited':
-      return '#6c757d'; // gray
     case 'pending':
     default:
-      return '#6c757d'; // gray
+      return 'bg-secondary text-secondary-foreground';
   }
 };
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // Deep imports (instead of `from 'lucide-react'`) avoid pulling the whole icon set into the
 // bundle — lucide-react's barrel file isn't tree-shaken by this webpack config and previously
@@ -21,15 +21,20 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 import Analytics from '@src/analytics';
 import { convertToCsv, copyToClipboard } from '@src/utils';
 import type { LinkValidation, StatusFilter } from '@src/validation';
-import { getStatusLabel } from '@src/validation';
+import { getStatusLabel, VALIDATIONS_PER_MINUTE } from '@src/validation';
 
 import ExportMenu, { type ExportScope } from './ExportMenu';
 import FilterMenu from './FilterMenu';
 import ValidationProgress from './ValidationProgress';
+
+// How long a "Copied" label sticks before reverting to "Copy" — long enough to register as
+// confirmation, short enough that reopening the menu later never shows a stale success state.
+const COPY_FEEDBACK_MS = 2000;
 
 interface PropTypes {
   isGoogleSearchPage: boolean;
@@ -87,6 +92,7 @@ function Actions({
   const [hasCopyAsText, setHasCopyAsText] = useState(false);
   const [isCopyAsText, setIsCopyAsText] = useState(false);
   const [isProgressMinimized, setIsProgressMinimized] = useState(false);
+  const copyFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Each new validation run re-opens the detailed dialog, even if the previous run had been
   // minimized — only fires on the false->true edge, so it won't fight a minimize click mid-run.
@@ -95,6 +101,15 @@ function Actions({
       setIsProgressMinimized(false);
     }
   }, [isValidating]);
+
+  // Clears any pending "revert to Copy" timer on unmount so it doesn't fire against an
+  // already-torn-down component.
+  useEffect(
+    () => () => {
+      if (copyFeedbackTimerRef.current) clearTimeout(copyFeedbackTimerRef.current);
+    },
+    []
+  );
 
   const minimizeProgress = () => {
     Analytics.fireEvent('validation_progress_minimized');
@@ -130,6 +145,10 @@ function Actions({
     onFetch();
   };
 
+  const validateHint = isScoped
+    ? `Check the status of just the ${visibleLinks.length} link(s) shown`
+    : "Check each link's status (active / expired / invalid)";
+
   const onValidateHandler = () => {
     if (onValidateAll) {
       const targetLinks = isScoped ? visibleLinks : undefined;
@@ -144,11 +163,20 @@ function Actions({
     onClearCache();
   };
 
+  // Warns before the cost is incurred rather than after — auto-validate checks every link the
+  // moment it's extracted, so a large Google Search result set can mean minutes of rate-limited
+  // requests the user didn't see coming from the switch alone.
+  const autoValidateEtaMinutes = links.length > VALIDATIONS_PER_MINUTE ? Math.ceil(links.length / VALIDATIONS_PER_MINUTE) : null;
+  const autoValidateHint = `Automatically validate links as soon as they're extracted.${
+    autoValidateEtaMinutes ? ` With ${links.length} links found so far, that's roughly ${autoValidateEtaMinutes} minute(s).` : ''
+  }`;
+
   const handleCopy = async (format: string) => {
     const eventPrefix = exportScope === 'valid' ? 'valid_links' : `${format}_link`;
     Analytics.fireEvent(`${eventPrefix}_copied`, { total: activeLinks.length });
     const isTextFormat = format === 'text';
 
+    if (copyFeedbackTimerRef.current) clearTimeout(copyFeedbackTimerRef.current);
     setHasCopyAsJSON(false);
     setHasCopyAsText(false);
 
@@ -169,6 +197,10 @@ function Actions({
         setIsCopyAsJSON(false);
         setHasCopyAsJSON(true);
       }
+      copyFeedbackTimerRef.current = setTimeout(() => {
+        setHasCopyAsText(false);
+        setHasCopyAsJSON(false);
+      }, COPY_FEEDBACK_MS);
     } catch {
       if (isTextFormat) {
         setIsCopyAsText(false);
@@ -209,88 +241,96 @@ function Actions({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {isGoogleSearchPage && links.length > 0 && (
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            onClick={onFetchHandler}
-            disabled={isLoading}
-            title="Re-scan this page's search results for WhatsApp invite links"
-          >
-            {isLoading && <Loader2Icon className="animate-spin" />}
-            Extract again
-          </Button>
-        )}
+        {/* Primary — actions that change data */}
+        <div className="flex flex-wrap items-center gap-2">
+          {isGoogleSearchPage && links.length > 0 && (
+            <Tooltip>
+              <TooltipTrigger render={<Button type="button" size="sm" variant="secondary" onClick={onFetchHandler} disabled={isLoading} />}>
+                {isLoading && <Loader2Icon className="animate-spin" />}
+                Extract again
+              </TooltipTrigger>
+              <TooltipContent>Re-scan this page&apos;s search results for WhatsApp invite links</TooltipContent>
+            </Tooltip>
+          )}
+          {links.length > 0 && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={onValidateHandler}
+                    disabled={isValidating || (isScoped && visibleLinks.length === 0)}
+                  />
+                }
+              >
+                {isValidating && <Loader2Icon className="animate-spin" />}
+                {isValidating
+                  ? 'Validating...'
+                  : isScoped
+                    ? `Validate ${visibleLinks.length} shown`
+                    : hasAnyValidation
+                      ? 'Re-validate links'
+                      : 'Validate links'}
+              </TooltipTrigger>
+              <TooltipContent>{validateHint}</TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+
+        {(onToggleAutoValidate || links.length > 0) && <div aria-hidden="true" className="hidden h-5 w-px bg-border sm:block" />}
+
+        {/* Secondary — view preferences and output */}
+        <div className="flex flex-wrap items-center gap-2">
+          {onToggleAutoValidate && (
+            <Tooltip>
+              <TooltipTrigger render={<Label className="cursor-pointer text-xs font-normal text-muted-foreground" />}>
+                <Switch size="sm" checked={!!autoValidate} onCheckedChange={onToggleAutoValidate} />
+                Auto-validate
+              </TooltipTrigger>
+              <TooltipContent>{autoValidateHint}</TooltipContent>
+            </Tooltip>
+          )}
+          {links.length > 0 && (
+            <FilterMenu
+              hideDuplicates={hideDuplicates}
+              isOpen={isFilterOpen}
+              onOpenChange={setIsFilterOpen}
+              onStatusFilterChange={onStatusFilterChange}
+              onToggleHideDuplicates={onToggleHideDuplicates}
+              statusCounts={statusCounts}
+              statusFilter={statusFilter}
+            />
+          )}
+          {links.length > 0 && (
+            <ExportMenu
+              exportScope={exportScope}
+              hasCopyAsJSON={hasCopyAsJSON}
+              hasCopyAsText={hasCopyAsText}
+              isCopyAsJSON={isCopyAsJSON}
+              isCopyAsText={isCopyAsText}
+              isOpen={isExportOpen}
+              onCopy={handleCopy}
+              onDownload={handleDownload}
+              onOpenChange={setIsExportOpen}
+              onScopeChange={setExportScope}
+              validLinksCount={validLinks.length}
+              visibleLinksCount={visibleLinks.length}
+            />
+          )}
+        </div>
+
         {links.length > 0 && (
-          <Button
-            type="button"
-            size="sm"
-            onClick={onValidateHandler}
-            disabled={isValidating || (isScoped && visibleLinks.length === 0)}
-            title={
-              isScoped
-                ? `Check the status of just the ${visibleLinks.length} link(s) shown`
-                : "Check each link's status (active / expired / invalid)"
-            }
-          >
-            {isValidating && <Loader2Icon className="animate-spin" />}
-            {isValidating
-              ? 'Validating...'
-              : isScoped
-                ? `Validate ${visibleLinks.length} shown`
-                : hasAnyValidation
-                  ? 'Re-validate links'
-                  : 'Validate links'}
-          </Button>
-        )}
-        {onToggleAutoValidate && (
-          <Label
-            title="Automatically validate links as soon as they're extracted"
-            className="cursor-pointer text-xs font-normal text-muted-foreground"
-          >
-            <Switch size="sm" checked={!!autoValidate} onCheckedChange={onToggleAutoValidate} />
-            Auto-validate
-          </Label>
-        )}
-        {links.length > 0 && (
-          <FilterMenu
-            hideDuplicates={hideDuplicates}
-            isOpen={isFilterOpen}
-            onOpenChange={setIsFilterOpen}
-            onStatusFilterChange={onStatusFilterChange}
-            onToggleHideDuplicates={onToggleHideDuplicates}
-            statusCounts={statusCounts}
-            statusFilter={statusFilter}
-          />
-        )}
-        {links.length > 0 && (
-          <ExportMenu
-            exportScope={exportScope}
-            hasCopyAsJSON={hasCopyAsJSON}
-            hasCopyAsText={hasCopyAsText}
-            isCopyAsJSON={isCopyAsJSON}
-            isCopyAsText={isCopyAsText}
-            isOpen={isExportOpen}
-            onCopy={handleCopy}
-            onDownload={handleDownload}
-            onOpenChange={setIsExportOpen}
-            onScopeChange={setExportScope}
-            validLinksCount={validLinks.length}
-            visibleLinksCount={visibleLinks.length}
-          />
-        )}
-        {links.length > 0 && (
-          <Button
-            type="button"
-            size="sm"
-            variant="destructive"
-            onClick={() => setIsClearCacheOpen(true)}
-            title="Delete cached validation results so every link is re-checked from scratch"
-          >
-            <Trash2Icon />
-            Clear cache
-          </Button>
+          <>
+            <div aria-hidden="true" className="hidden h-5 w-px bg-border sm:block" />
+            <Tooltip>
+              <TooltipTrigger render={<Button type="button" size="sm" variant="destructive" onClick={() => setIsClearCacheOpen(true)} />}>
+                <Trash2Icon />
+                Clear cache
+              </TooltipTrigger>
+              <TooltipContent>Delete cached validation results so every link is re-checked from scratch</TooltipContent>
+            </Tooltip>
+          </>
         )}
       </div>
       {/* Validation keeps running in the background regardless of this dialog's visibility —
@@ -306,9 +346,13 @@ function Actions({
                 Keep working while this runs in the background — minimize it and reopen anytime from the floating indicator.
               </DialogDescription>
             </div>
-            <Button type="button" size="icon-sm" variant="ghost" onClick={minimizeProgress} title="Minimize">
-              <ChevronDownIcon />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger render={<Button type="button" size="icon-sm" variant="ghost" onClick={minimizeProgress} />}>
+                <ChevronDownIcon />
+                <span className="sr-only">Minimize</span>
+              </TooltipTrigger>
+              <TooltipContent>Minimize</TooltipContent>
+            </Tooltip>
           </DialogHeader>
           <ValidationProgress
             fallbackTotal={links.length}
@@ -321,16 +365,15 @@ function Actions({
         </DialogContent>
       </Dialog>
       {isValidating && isProgressMinimized && (
-        <Button
-          type="button"
-          size="sm"
-          onClick={restoreProgress}
-          title="Show validation progress"
-          className="fixed right-3 bottom-3 z-50 shadow-lg"
-        >
-          <Loader2Icon className="animate-spin" />
-          {`Validating... ${progressDone}/${progressTotal}`}
-        </Button>
+        <Tooltip>
+          <TooltipTrigger
+            render={<Button type="button" size="sm" onClick={restoreProgress} className="fixed right-3 bottom-3 z-50 shadow-lg" />}
+          >
+            <Loader2Icon className="animate-spin" />
+            {`Validating... ${progressDone}/${progressTotal}`}
+          </TooltipTrigger>
+          <TooltipContent>Show validation progress</TooltipContent>
+        </Tooltip>
       )}
       <AlertDialog open={isClearCacheOpen} onOpenChange={setIsClearCacheOpen}>
         <AlertDialogContent>

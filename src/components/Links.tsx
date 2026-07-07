@@ -4,7 +4,7 @@ import { TableVirtuoso } from 'react-virtuoso';
 
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { TableBody, TableHeader, TableRow } from '@/components/ui/table';
+import { TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 import Analytics from '@src/analytics';
 import { useCachedValidations } from '@src/hooks/use-cached-validations';
@@ -90,7 +90,7 @@ function Links({
 
   if (links.length === 0) {
     return (
-      <div className="flex h-[calc(100vh-57px)] flex-col items-center justify-center gap-3 text-center animate-in">
+      <div className="flex h-[calc(100vh-var(--header-height))] flex-col items-center justify-center gap-3 text-center animate-in">
         <p className="text-sm text-muted-foreground">
           {isGoogleSearch ? 'No WhatsApp group links found in these search results.' : 'No WhatsApp group links extracted.'}
         </p>
@@ -137,6 +137,12 @@ function Links({
           data={displayedLinks}
           components={tableComponents}
           computeItemKey={(_index, link) => link}
+          fixedHeaderContent={() => (
+            <TableRow>
+              <TableHead className="w-12 bg-background">#</TableHead>
+              <TableHead className="bg-background">Group</TableHead>
+            </TableRow>
+          )}
           itemContent={(index, link) => <LinkRow index={index} link={link} validation={validations[link]} />}
           useWindowScroll
         />

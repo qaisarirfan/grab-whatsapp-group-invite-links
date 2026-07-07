@@ -5,6 +5,7 @@ import HelpFaq from '@components/HelpFaq';
 import Links from '@components/Links';
 import Logs from '@components/Logs';
 import Tab from '@components/Tabs';
+import ThemeToggle from '@components/ThemeToggle';
 
 import Analytics from '@src/analytics';
 import { GOOGLE_SEARCH_URL } from '@src/constants';
@@ -18,7 +19,7 @@ function App() {
   const [googleSearchLinks, setGoogleSearchLinks] = useState<string[]>([]);
   const [links, setLinks] = useState<string[]>([]);
   const [otherLinks, setOtherLinks] = useState<string[]>([]);
-  const [currentTab, setCurrentTab] = useState('links');
+  const [currentTab, setCurrentTab] = useState('x');
 
   const isGoogleSearchPage = isGoogle(currentURL);
 
@@ -47,7 +48,7 @@ function App() {
     validateAllLinks,
   });
 
-  useSystemTheme();
+  const { mode: themeMode, setMode: setThemeMode } = useSystemTheme();
 
   useEffect(() => {
     Analytics.fireEvent('extension_loaded');
@@ -56,7 +57,9 @@ function App() {
       await loadAutoValidateSetting();
 
       chrome.tabs.query({ active: true, windowId: chrome.windows.WINDOW_ID_CURRENT }, (tabs) => {
-        const { url, id, title } = tabs[0];
+        const [tab] = tabs;
+        if (!tab) return;
+        const { url, id, title } = tab;
         Analytics.firePageViewEvent(title ?? '', url ?? '');
 
         if (!id) return;
@@ -105,69 +108,78 @@ function App() {
 
   const showLogsTab = isGoogleSearchPage && hasFetched;
   const showLinksTab = isGoogleSearchPage ? hasFetched : links.length > 0;
+  // Tab membership stays fixed per page type — Logs only ever applies in Google Search mode, so
+  // its presence there is a structural difference, not state churn. Links/Help/Home never appear
+  // or disappear mid-session; a tab that isn't ready yet is disabled instead, so the bar never
+  // reflows under the user while they're mid-task.
   const tabs = [
-    ...(isGoogleSearchPage || currentTab === 'help' ? [{ name: 'Home', key: 'x' }] : []),
-    ...(showLogsTab ? [{ name: 'Logs', key: 'logs' }] : []),
-    ...(showLinksTab ? [{ name: 'Links', key: 'links' }] : []),
+    { name: 'Home', key: 'x' },
+    ...(isGoogleSearchPage ? [{ name: 'Logs', key: 'logs', disabled: !showLogsTab }] : []),
+    { name: 'Links', key: 'links', disabled: !showLinksTab },
     { name: 'Help & FAQs', key: 'help' },
   ];
   const showFallback = currentTab !== 'help' && !(currentTab === 'links' && showLinksTab) && !(currentTab === 'logs' && showLogsTab);
 
   return (
-    <div className="relative h-full max-w-162.5 min-w-162.5 p-3">
-      <div className="flex items-center justify-between border-b">
-        <Tab
-          tabs={tabs}
-          currentSelected={currentTab}
-          onTabSelected={(tab) => {
-            Analytics.fireEvent('tab_changed', { tab });
-            setCurrentTab(tab);
-          }}
-        />
-        <div className="flex items-center gap-3 fixed top-2 right-3">
+    <div className="relative h-full w-200 p-3">
+      <div className="flex items-center justify-between gap-2 border-b">
+        <nav aria-label="Sections" className="min-w-0 overflow-x-auto">
+          <Tab
+            tabs={tabs}
+            currentSelected={currentTab}
+            onTabSelected={(tab) => {
+              Analytics.fireEvent('tab_changed', { tab });
+              setCurrentTab(tab);
+            }}
+          />
+        </nav>
+        <div className="flex shrink-0 items-center gap-3">
+          <ThemeToggle mode={themeMode} onChange={setThemeMode} />
           <p>Support me on</p>
           <a href="https://www.buymeacoffee.com/qaisarirfan" target="_blank" rel="noreferrer">
             <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" className="h-7.5" />
           </a>
         </div>
       </div>
-      {currentTab === 'links' && showLinksTab && (
-        <Links
-          links={links}
-          fetchAll={fetchAll}
-          isLoading={isLoading}
-          isGoogleSearch={isGoogleSearchPage}
-          onValidateAll={validateAllLinks}
-          onCancelValidation={cancelValidation}
-          onRetryValidation={retryValidation}
-          isValidating={isValidating}
-          validationProgress={validationProgress}
-          inFlightLinks={inFlightLinks}
-          queuedLinks={queuedLinks}
-          autoValidate={autoValidate}
-          onToggleAutoValidate={toggleAutoValidate}
-        />
-      )}
-      {currentTab === 'logs' && showLogsTab && (
-        <Logs logs={logs.reverse()} isLoading={isLoading} progress={`${logs.length}/${searchLinks.length}`} />
-      )}
-      {currentTab === 'help' && <HelpFaq />}
-      {showFallback && (
-        <EmptyState
-          isGoogleSearchPage={isGoogleSearchPage}
-          searchLinksCount={searchLinks.length}
-          otherLinks={otherLinks}
-          isLoading={isLoading}
-          showExtractAgain={logs.length > 0 && links.length === 0}
-          onExtractClick={() => {
-            Analytics.fireEvent('extract_clicked', {
-              page: currentURL,
-              google_links: searchLinks.length,
-            });
-            fetchAll();
-          }}
-        />
-      )}
+      <main>
+        {currentTab === 'links' && showLinksTab && (
+          <Links
+            links={links}
+            fetchAll={fetchAll}
+            isLoading={isLoading}
+            isGoogleSearch={isGoogleSearchPage}
+            onValidateAll={validateAllLinks}
+            onCancelValidation={cancelValidation}
+            onRetryValidation={retryValidation}
+            isValidating={isValidating}
+            validationProgress={validationProgress}
+            inFlightLinks={inFlightLinks}
+            queuedLinks={queuedLinks}
+            autoValidate={autoValidate}
+            onToggleAutoValidate={toggleAutoValidate}
+          />
+        )}
+        {currentTab === 'logs' && showLogsTab && (
+          <Logs logs={logs.reverse()} isLoading={isLoading} progress={`${logs.length}/${searchLinks.length}`} />
+        )}
+        {currentTab === 'help' && <HelpFaq />}
+        {showFallback && (
+          <EmptyState
+            isGoogleSearchPage={isGoogleSearchPage}
+            searchLinksCount={searchLinks.length}
+            otherLinks={otherLinks}
+            isLoading={isLoading}
+            showExtractAgain={logs.length > 0 && links.length === 0}
+            onExtractClick={() => {
+              Analytics.fireEvent('extract_clicked', {
+                page: currentURL,
+                google_links: searchLinks.length,
+              });
+              fetchAll();
+            }}
+          />
+        )}
+      </main>
     </div>
   );
 }

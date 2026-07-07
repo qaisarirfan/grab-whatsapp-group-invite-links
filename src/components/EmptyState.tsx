@@ -1,10 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
+import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 import { Button } from '@components/ui/button';
 
 import Header from './Header';
+
+// Only ever needs writing once per install, so a plain storage flag is enough — no reason to
+// route this through the more general autoValidate-style settings hooks.
+const FIRST_RUN_STORAGE_KEY = 'hasSeenIntro';
 
 interface PropTypes {
   isGoogleSearchPage: boolean;
@@ -17,6 +22,7 @@ interface PropTypes {
 
 function EmptyState({ isGoogleSearchPage, searchLinksCount, otherLinks, isLoading, showExtractAgain, onExtractClick }: PropTypes) {
   const [isOtherLinksOpen, setIsOtherLinksOpen] = useState(false);
+  const [showIntro, setShowIntro] = useState(false);
   const otherLinksCount = otherLinks.length;
   const nonGoogleMessage = [
     'There is no WhatsApp group link on this page',
@@ -25,9 +31,37 @@ function EmptyState({ isGoogleSearchPage, searchLinksCount, otherLinks, isLoadin
     .join('')
     .trim();
 
+  useEffect(() => {
+    chrome.storage.local
+      .get(FIRST_RUN_STORAGE_KEY)
+      .then((stored) => {
+        if (!stored[FIRST_RUN_STORAGE_KEY]) setShowIntro(true);
+      })
+      .catch(() => {});
+  }, []);
+
+  const dismissIntro = () => {
+    setShowIntro(false);
+    chrome.storage.local.set({ [FIRST_RUN_STORAGE_KEY]: true }).catch(() => {});
+  };
+
   return (
-    <div className="flex flex-1 flex-col h-[calc(100vh-57px)] justify-center space-y-1.5 overflow-y-auto animate-in">
+    <div className="flex flex-1 flex-col h-[calc(100vh-var(--header-height))] justify-center space-y-1.5 overflow-y-auto animate-in">
       <Header />
+      {showIntro && (
+        <Alert className="mx-auto max-w-sm">
+          <AlertTitle>Two ways to use this</AlertTitle>
+          <AlertDescription>
+            On any regular page, WhatsApp group invite links already on it show up here automatically. On a Google Search results page,
+            click Extract to scan every result for invite links instead.
+          </AlertDescription>
+          <AlertAction>
+            <Button type="button" size="xs" variant="ghost" onClick={dismissIntro}>
+              Got it
+            </Button>
+          </AlertAction>
+        </Alert>
+      )}
       {!isGoogleSearchPage && (
         <>
           <p className="text-center">{nonGoogleMessage}</p>
@@ -73,8 +107,8 @@ function EmptyState({ isGoogleSearchPage, searchLinksCount, otherLinks, isLoadin
           <div className="text-center">
             <div className="flex items-center justify-center mt-3">
               <span className="relative inline-flex">
-                <span className="absolute -top-1 -right-1 flex size-3">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 opacity-75"></span>
+                <span aria-hidden="true" className="absolute -top-1 -right-1 flex size-3">
+                  <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-yellow-400 opacity-75"></span>
                   <span className="relative inline-flex size-3 rounded-full bg-yellow-500"></span>
                 </span>
                 <Button
@@ -82,7 +116,8 @@ function EmptyState({ isGoogleSearchPage, searchLinksCount, otherLinks, isLoadin
                   size={'lg'}
                   variant={'outline'}
                   onClick={onExtractClick}
-                  disabled={isLoading}
+                  disabled={isLoading || searchLinksCount === 0}
+                  title={searchLinksCount === 0 ? 'No Google search results detected on this page' : undefined}
                   className="rounded-sm px-5"
                 >
                   {isLoading && (

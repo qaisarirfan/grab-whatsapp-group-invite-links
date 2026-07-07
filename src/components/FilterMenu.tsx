@@ -18,6 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 import type { StatusFilter } from '@src/validation';
 import { getStatusLabel, getStatusTooltip } from '@src/validation';
@@ -47,10 +48,13 @@ function FilterMenu({
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger render={<Button type="button" size="sm" variant="outline" title="Filter links by status" />}>
-        {`Filter: ${activeLabel}`}
-        {isOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger render={<DropdownMenuTrigger render={<Button type="button" size="sm" variant="outline" />} />}>
+          {`Filter: ${activeLabel}`}
+          {isOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+        </TooltipTrigger>
+        <TooltipContent>Filter links by status</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Status</DropdownMenuLabel>

@@ -19,6 +19,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export type ExportScope = 'shown' | 'valid';
 
@@ -53,10 +54,13 @@ function ExportMenu({
 }: PropTypes) {
   return (
     <DropdownMenu open={isOpen} onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger render={<Button type="button" size="sm" variant="outline" title="Copy or download the extracted links" />}>
-        Export
-        {isOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
-      </DropdownMenuTrigger>
+      <Tooltip>
+        <TooltipTrigger render={<DropdownMenuTrigger render={<Button type="button" size="sm" variant="outline" />} />}>
+          Export
+          {isOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+        </TooltipTrigger>
+        <TooltipContent>Copy or download the extracted links</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuGroup>
           <DropdownMenuLabel>Scope</DropdownMenuLabel>

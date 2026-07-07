@@ -2,10 +2,11 @@ import { useState } from 'react';
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 import Analytics from '@src/analytics';
 import type { LinkStatus } from '@src/validation';
-import { getStatusColor, getStatusLabel, getStatusTooltip } from '@src/validation';
+import { getStatusBadgeClassName, getStatusLabel, getStatusTooltip } from '@src/validation';
 
 const BADGE_STATUSES: LinkStatus[] = ['valid', 'expired', 'invalid', 'rate-limited'];
 
@@ -130,9 +131,7 @@ function HelpFaq() {
         <ul className="flex flex-col gap-2">
           {BADGE_STATUSES.map((status) => (
             <li key={status} className="flex items-start gap-2">
-              <Badge style={{ backgroundColor: getStatusColor(status), color: '#fff' }} className="mt-0.5 border-transparent">
-                {getStatusLabel(status)}
-              </Badge>
+              <Badge className={cn('mt-0.5 border-transparent', getStatusBadgeClassName(status))}>{getStatusLabel(status)}</Badge>
               <span className="text-sm text-muted-foreground">{getStatusTooltip(status)}</span>
             </li>
           ))}

@@ -1,9 +1,11 @@
-import { Avatar, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { TableCell } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 import type { LinkValidation } from '@src/validation';
-import { getStatusColor, getStatusLabel, getStatusTooltip } from '@src/validation';
+import { getStatusBadgeClassName, getStatusLabel, getStatusTooltip } from '@src/validation';
 
 interface PropTypes {
   index: number;
@@ -14,7 +16,6 @@ interface PropTypes {
 function LinkRow({ index, link, validation }: PropTypes) {
   const hasValidation = !!validation;
   const status = validation?.status || 'pending';
-  const color = getStatusColor(status);
   const label = getStatusLabel(status);
   const timestamp = validation?.lastValidated ? new Date(validation.lastValidated).toLocaleDateString() : '';
 
@@ -28,11 +29,13 @@ function LinkRow({ index, link, validation }: PropTypes) {
       </TableCell>
       <TableCell>
         <div className="flex h-full items-start gap-2">
-          {validation?.iconUrl && (
-            <Avatar>
-              <AvatarImage src={validation.iconUrl} alt="" />
-            </Avatar>
-          )}
+          {/* Always mounted (not just once iconUrl resolves) so the row's left edge is stable from
+              first paint — validations stream in asynchronously, and an avatar that only appears
+              on success used to shift every row's text as results arrived. */}
+          <Avatar>
+            {validation?.iconUrl && <AvatarImage src={validation.iconUrl} alt="" />}
+            <AvatarFallback>{validation?.name?.[0]?.toUpperCase() ?? '?'}</AvatarFallback>
+          </Avatar>
           <div>
             {validation?.name && <div className="mb-0.5 font-semibold">{validation.name}</div>}
             <div className="mb-1">
@@ -43,9 +46,12 @@ function LinkRow({ index, link, validation }: PropTypes) {
             <div className="flex items-center gap-2">
               {hasValidation && (
                 <>
-                  <Badge style={{ backgroundColor: color, color: '#fff' }} title={getStatusTooltip(status)} className="border-transparent">
-                    {label}
-                  </Badge>
+                  <Tooltip>
+                    <TooltipTrigger render={<Badge className={cn('border-transparent', getStatusBadgeClassName(status))} />}>
+                      {label}
+                    </TooltipTrigger>
+                    <TooltipContent>{getStatusTooltip(status)}</TooltipContent>
+                  </Tooltip>
                   {timestamp && <div className="text-[11px] text-muted-foreground">Last checked: {timestamp}</div>}
                 </>
               )}

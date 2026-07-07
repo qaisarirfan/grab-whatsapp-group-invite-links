@@ -6,6 +6,7 @@ interface Props {
   tabs: {
     key: string;
     name: string;
+    disabled?: boolean;
   }[];
 }
 
@@ -14,7 +15,7 @@ function Tab({ currentSelected, tabs, onTabSelected }: Props) {
     <Tabs value={currentSelected} onValueChange={(value) => onTabSelected(value as string)}>
       <TabsList variant="line">
         {tabs.map((tab) => (
-          <TabsTrigger key={tab.key} value={tab.key}>
+          <TabsTrigger key={tab.key} value={tab.key} disabled={tab.disabled} title={tab.disabled ? 'Not available yet' : undefined}>
             {tab.name}
           </TabsTrigger>
         ))}

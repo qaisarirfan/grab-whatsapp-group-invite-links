@@ -53,7 +53,7 @@ function ValidationProgress({ fallbackTotal, inFlightLinks, queuedLinks, validat
         <span>{`${progressDone}/${progressTotal} (${progressPercent}%)${etaHint}`}</span>
         <span>{`${inFlightLinks && inFlightLinks.length > 1 ? ` (+${inFlightLinks.length - 1} more in flight)` : ''}`}</span>
       </div>
-      <Progress value={progressPercent} className="gap-0" />
+      <Progress aria-label="Validating links" value={progressPercent} className="gap-0" />
       <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground max-w-full">
         <span className="min-w-0 flex-1 truncate font-mono" title={inFlightLinks?.join('\n')}>
           {displayLink ? `Validating ${displayLink}` : 'Validating...'}
