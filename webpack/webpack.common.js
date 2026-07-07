@@ -113,7 +113,7 @@ module.exports = {
       chunks: ['popup'], // Only include the popup script
     }),
     new CopyPlugin({
-      patterns: [{ from: '.', to: '../dist', context: 'public' }],
+      patterns: [{ from: '.', to: '.', context: 'public' }],
     }),
     new BundleAnalyzerPlugin({
       analyzerMode: 'static',
