@@ -1,3 +1,4 @@
+require("dotenv")
 const { execSync } = require('child_process');
 
 // release-it's GitHub plugin reads GITHUB_TOKEN from the environment. Fall
