@@ -1,4 +1,3 @@
-require("dotenv")
 const { execSync } = require('child_process');
 
 // release-it's GitHub plugin reads GITHUB_TOKEN from the environment. Fall
@@ -33,6 +32,11 @@ module.exports = {
   },
   github: {
     release: true,
+    // The origin remote uses an SSH host alias (github-qaisar.com, see
+    // ~/.ssh/config) for multi-account auth. release-it derives the API host
+    // from the remote URL and would otherwise treat that alias as a GitHub
+    // Enterprise install, pointing requests at a nonexistent host.
+    host: 'github.com',
     releaseName: 'v${version}',
     assets: ['grab-whatsapp-group-invite-links.zip'],
   },
@@ -47,17 +51,39 @@ module.exports = {
       header: '# Changelog',
       preset: {
         name: 'conventionalcommits',
-        types: [
-          { type: 'feat', section: 'Features' },
-          { type: 'fix', section: 'Bug Fixes' },
-          { type: 'perf', section: 'Performance' },
-          { type: 'refactor', section: 'Refactoring' },
-          { type: 'docs', section: 'Documentation' },
-          { type: 'chore', hidden: true },
-          { type: 'style', hidden: true },
-          { type: 'test', hidden: true },
-          { type: 'build', hidden: true },
-          { type: 'ci', hidden: true },
+        type: [
+          {
+            type: 'feat',
+            section: 'Features',
+          },
+          {
+            type: 'fix',
+            section: 'Bug Fixes',
+          },
+          {
+            type: 'perf',
+            section: 'Performance Improvements',
+          },
+          {
+            type: 'revert',
+            section: 'Reverts',
+          },
+          {
+            type: 'docs',
+            section: 'Documentation',
+          },
+          {
+            type: 'refactor',
+            section: 'Code Refactoring',
+          },
+          {
+            type: 'test',
+            section: 'Tests',
+          },
+          {
+            type: 'ci',
+            section: 'Continuous Integration',
+          },
         ],
       },
     },
