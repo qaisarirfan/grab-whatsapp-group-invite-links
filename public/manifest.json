@@ -3,7 +3,7 @@
 
   "name": "Grab WhatsApp Group Invite Links",
   "description": "Grab WhatsApp Group Invite Links",
-  "version": "5.0.0",
+  "version": "6.0.0",
 
   "action": {
     "default_icon": {
