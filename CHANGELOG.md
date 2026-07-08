@@ -1,5 +1,11 @@
 # Changelog
 
+## [6.0.1](https://github-qaisar.com/qaisarirfan/grab-whatsapp-group-invite-links/compare/v6.0.0...v6.0.1) (2026-07-08)
+
+### Bug Fixes
+
+* **popup:** default to Links tab on non-Google pages, drop redundant Home tab ([fac61b7](https://github-qaisar.com/qaisarirfan/grab-whatsapp-group-invite-links/commit/fac61b7c7b9f49f4426f667f1c858f43571a36ad))
+
 ## 6.0.0 (2026-07-08)
 
 ### Features
