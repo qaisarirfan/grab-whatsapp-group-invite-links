@@ -22,6 +22,8 @@ A new browser tab opens automatically the first time you install the extension, 
 
 ## How to use it
 
+The first time you open the popup, a short tip explains these two modes — click **Got it** to dismiss it. It's remembered from then on, so it won't appear again unless you reinstall the extension.
+
 ### On a regular webpage
 
 1. Navigate to any webpage that may contain WhatsApp group links.
@@ -66,7 +68,7 @@ Once at least one link has been found, a **Clear cache** button appears in the a
 
 ### Getting back to the start screen
 
-A **Home** tab appears alongside the others while you're using Google Search mode, or whenever you have **Help & FAQs** open — click it to return to the extension's starting screen (the Extract button, or the "no WhatsApp link" message), for example to run a fresh search.
+A **Home** tab appears alongside the others only in Google Search mode — click it to return to the Extract screen, for example to run a fresh search on a different results page. On a regular webpage there's no separate Home tab: the popup opens straight into the **Links** tab, showing either your found links or the "no WhatsApp link" message directly.
 
 ### Help & FAQs, right in the popup
 
@@ -156,8 +158,11 @@ None of the Google search results contained a WhatsApp link. The Links tab shows
 **What should I search for on Google to find more WhatsApp groups?**
 Start with `site:chat.whatsapp.com` plus a topic keyword (e.g. `site:chat.whatsapp.com yoga`), or an exact phrase like `"whatsapp group link"` alongside your topic. See **Tips for searching Google** above for more examples. Since Extract only reads the current results page, page through Google's results (page 2, 3, …) and extract again on each page for more links.
 
+**What's the tip that says "Two ways to use this" the first time I open the popup?**
+It's a one-time welcome message explaining the extension's two modes — regular webpage scanning and Google Search extraction. Click **Got it** to dismiss it; it won't show again on future opens unless you reinstall the extension.
+
 **What is the Home tab for?**
-It appears while you're using Google Search mode, or whenever **Help & FAQs** is open, as a way back to the extension's starting screen — handy if you want to run a fresh search or just start over.
+It only appears in Google Search mode, as a way back to the Extract screen — handy for running a fresh search. On a regular webpage there's no Home tab; the popup opens directly on the **Links** tab instead.
 
 **Why does a search result show an error in red in the Logs tab?**
 That specific page couldn't be reached or scraped (for example, it was down or blocked the request). Extraction automatically skips it and continues with the rest — no action needed on your part.

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { TableComponents } from 'react-virtuoso';
 import { TableVirtuoso } from 'react-virtuoso';
 
-import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
@@ -12,6 +11,7 @@ import type { StatusFilter } from '@src/validation';
 import { clearValidationCache, dedupeLinksByGroupName, filterLinksByStatus, getStatusCounts } from '@src/validation';
 
 import Actions from './Actions';
+import EmptyState from './EmptyState';
 import LinkRow from './LinkRow';
 import LinksSkeleton from './LinksSkeleton';
 
@@ -33,6 +33,10 @@ interface PropTypes {
   isGoogleSearch: boolean;
   isLoading: boolean;
   links: string[];
+  searchLinksCount: number;
+  otherLinks: string[];
+  showExtractAgain: boolean;
+  onExtractClick: () => void;
   onValidateAll?: (targetLinks?: string[]) => void;
   onCancelValidation?: VoidFunction;
   onRetryValidation?: VoidFunction;
@@ -49,6 +53,10 @@ function Links({
   isLoading,
   fetchAll,
   isGoogleSearch,
+  searchLinksCount,
+  otherLinks,
+  showExtractAgain,
+  onExtractClick,
   onValidateAll,
   onCancelValidation,
   onRetryValidation,
@@ -91,14 +99,14 @@ function Links({
   if (links.length === 0) {
     return (
       <div className="flex h-[calc(100vh-var(--header-height))] flex-col items-center justify-center gap-3 text-center animate-in">
-        <p className="text-sm text-muted-foreground">
-          {isGoogleSearch ? 'No WhatsApp group links found in these search results.' : 'No WhatsApp group links extracted.'}
-        </p>
-        {isGoogleSearch && (
-          <Button type="button" variant="outline" size="sm" onClick={fetchAll}>
-            Extract again
-          </Button>
-        )}
+        <EmptyState
+          isGoogleSearchPage={isGoogleSearch}
+          searchLinksCount={searchLinksCount}
+          otherLinks={otherLinks}
+          isLoading={isLoading}
+          showExtractAgain={showExtractAgain}
+          onExtractClick={onExtractClick}
+        />
       </div>
     );
   }

@@ -50,6 +50,14 @@ function App() {
 
   const { mode: themeMode, setMode: setThemeMode } = useSystemTheme();
 
+  const handleExtractClick = () => {
+    Analytics.fireEvent('extract_clicked', {
+      page: currentURL,
+      google_links: searchLinks.length,
+    });
+    fetchAll();
+  };
+
   useEffect(() => {
     Analytics.fireEvent('extension_loaded');
 
@@ -64,6 +72,7 @@ function App() {
 
         if (!id) return;
         setCurrentURL(url);
+        if (!isGoogle(url)) setCurrentTab('links');
         Analytics.fireEvent('page_type_detected', {
           is_google: isGoogle(url),
           url,
@@ -107,13 +116,15 @@ function App() {
   }, []);
 
   const showLogsTab = isGoogleSearchPage && hasFetched;
-  const showLinksTab = isGoogleSearchPage ? hasFetched : links.length > 0;
-  // Tab membership stays fixed per page type — Logs only ever applies in Google Search mode, so
-  // its presence there is a structural difference, not state churn. Links/Help/Home never appear
-  // or disappear mid-session; a tab that isn't ready yet is disabled instead, so the bar never
+  // Home only applies to the Google Search extract flow — on any other page, links are already
+  // shown automatically, so Links is the permanent landing tab instead.
+  const showLinksTab = isGoogleSearchPage ? hasFetched : true;
+  // Tab membership stays fixed per page type — Logs and Home only ever apply in Google Search
+  // mode, so their presence there is a structural difference, not state churn. Links/Help never
+  // disappear mid-session; a tab that isn't ready yet is disabled instead, so the bar never
   // reflows under the user while they're mid-task.
   const tabs = [
-    { name: 'Home', key: 'x' },
+    ...(isGoogleSearchPage ? [{ name: 'Home', key: 'x' }] : []),
     ...(isGoogleSearchPage ? [{ name: 'Logs', key: 'logs', disabled: !showLogsTab }] : []),
     { name: 'Links', key: 'links', disabled: !showLinksTab },
     { name: 'Help & FAQs', key: 'help' },
@@ -148,6 +159,10 @@ function App() {
             fetchAll={fetchAll}
             isLoading={isLoading}
             isGoogleSearch={isGoogleSearchPage}
+            searchLinksCount={searchLinks.length}
+            otherLinks={otherLinks}
+            showExtractAgain={logs.length > 0 && links.length === 0}
+            onExtractClick={handleExtractClick}
             onValidateAll={validateAllLinks}
             onCancelValidation={cancelValidation}
             onRetryValidation={retryValidation}
@@ -170,13 +185,7 @@ function App() {
             otherLinks={otherLinks}
             isLoading={isLoading}
             showExtractAgain={logs.length > 0 && links.length === 0}
-            onExtractClick={() => {
-              Analytics.fireEvent('extract_clicked', {
-                page: currentURL,
-                google_links: searchLinks.length,
-              });
-              fetchAll();
-            }}
+            onExtractClick={handleExtractClick}
           />
         )}
       </main>

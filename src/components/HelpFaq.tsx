@@ -27,9 +27,14 @@ const FAQS: { question: string; answer: string }[] = [
       'Try adding "site:chat.whatsapp.com" plus a topic keyword to your Google search, such as "site:chat.whatsapp.com yoga". Since Extract only reads the current results page, page through Google\'s results and click Extract again on each page for more links.',
   },
   {
+    question: 'What is the tip about two ways to use this the first time I open the popup?',
+    answer:
+      "It is a one-time welcome message explaining the extension's two modes, regular webpage scanning and Google Search extraction. Click Got it to dismiss it, it will not show again unless you reinstall the extension.",
+  },
+  {
     question: 'What is the Home tab for?',
     answer:
-      'It appears while you are using Google Search mode, or whenever Help & FAQs is open, as a way back to the starting screen, handy for running a fresh search or starting over.',
+      'It only appears in Google Search mode, as a way back to the Extract screen for running a fresh search. On a regular webpage there is no Home tab, the popup opens directly on the Links tab instead.',
   },
   {
     question: 'Why does a search result show an error in red in the Logs tab?',

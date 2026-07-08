@@ -6,3 +6,5 @@ tmp/
 *.zip
 .DS_Store
 .env
+release-notes.txt
+store-description.txt
